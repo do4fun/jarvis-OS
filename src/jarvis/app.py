@@ -58,7 +58,7 @@ from jarvis.interfaces.channels.setup import setup_channels
 from jarvis.interfaces.channels.telegram_bot import get_telegram_channel
 from jarvis.kernel.paths import UI_STATIC_DIR
 from jarvis.kernel.paths import PROJECT_ROOT
-from jarvis.kernel.settings import settings
+from jarvis.kernel.settings import reload_settings, settings
 from jarvis.providers.audio.clap_detector import ClapDetector
 from jarvis.providers.memory.search import FTSIndex
 from jarvis.providers.vision.daemon import run_vision_daemon
@@ -91,6 +91,21 @@ logger.add(
 async def _fts_rebuild_if_empty(fts_index: FTSIndex, sessions_dir: Path) -> None:
     if await fts_index.is_empty() and sessions_dir.exists():
         await fts_index.rebuild(sessions_dir)
+
+
+async def _watch_dotenv(env_path: Path) -> None:
+    """Surveille .env et recharge les settings dès que le fichier est modifié."""
+    last_mtime: float = env_path.stat().st_mtime if env_path.exists() else 0.0
+    while True:
+        await asyncio.sleep(1.0)
+        try:
+            mtime = env_path.stat().st_mtime
+        except FileNotFoundError:
+            continue
+        if mtime != last_mtime:
+            last_mtime = mtime
+            reload_settings()
+            logger.info("Settings rechargés depuis .env")
 
 
 # ── Lifespan ─────────────────────────────────────────────────
@@ -200,6 +215,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         asyncio.create_task(clap_detector.start(), name="clap-detector")
 
     worker_task = asyncio.create_task(container.worker.run_loop(), name="background-worker")
+    dotenv_task = asyncio.create_task(_watch_dotenv(PROJECT_ROOT / ".env"), name="dotenv-watcher")
     container.scheduler.start()
 
     # Routines
@@ -239,11 +255,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     yield
 
     container.scheduler.stop()
-    worker_task.cancel()
-    try:
-        await worker_task
-    except asyncio.CancelledError:
-        pass
+    for _task in (worker_task, dotenv_task):
+        _task.cancel()
+        try:
+            await _task
+        except asyncio.CancelledError:
+            pass
     if _messaging_gw is not None:
         await _messaging_gw.stop_all()
     else:

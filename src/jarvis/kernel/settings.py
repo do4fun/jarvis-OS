@@ -501,3 +501,13 @@ class Settings(BaseSettings):
 
 # Singleton — importé partout via `from config.settings import settings`
 settings = Settings()
+
+
+def reload_settings() -> None:
+    """Recharge les valeurs depuis .env et met à jour le singleton en place."""
+    fresh = Settings()
+    for field_name in Settings.model_fields:
+        try:
+            object.__setattr__(settings, field_name, getattr(fresh, field_name))
+        except Exception:
+            pass
