@@ -59,6 +59,27 @@ load_dotenv(PROJECT_ROOT / ".env")
 
 # Réduit le bruit du terminal : warnings Python + format loguru aligné sur main.py.
 warnings.filterwarnings("ignore", category=UserWarning, module="pkg_resources")
+
+# Quand le stderr est redirigé vers un fichier (pas de TTY), on supprime les codes
+# ANSI de tout le logging standard Python — livekit utilise son propre formatter
+# colorisé indépendamment de loguru ; ce patch couvre tous les StreamHandlers.
+if not sys.stderr.isatty():
+    import re as _re
+    _ANSI_RE = _re.compile(r"\x1b\[[0-9;]*[mGKHFJ]")
+    _orig_sh_emit = logging.StreamHandler.emit
+
+    def _plain_emit(self: logging.StreamHandler, record: logging.LogRecord) -> None:
+        try:
+            msg = self.format(record)
+            self.stream.write(_ANSI_RE.sub("", msg) + self.terminator)
+            self.flush()
+        except RecursionError:
+            raise
+        except Exception:
+            self.handleError(record)
+
+    logging.StreamHandler.emit = _plain_emit  # type: ignore[method-assign]
+
 try:
     from loguru import logger as _loguru
 
@@ -73,7 +94,7 @@ try:
             "<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level>"
             " | <cyan>{name}</cyan> — {message}"
         ),
-        colorize=True,
+        colorize=sys.stderr.isatty(),
     )
     _loguru.add(
         _log_dir / "voice.log",

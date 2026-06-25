@@ -76,7 +76,7 @@ _log_dir = (PROJECT_ROOT / settings.log_dir).resolve()
 _log_dir.mkdir(parents=True, exist_ok=True)
 
 logger.remove()
-logger.add(sys.stderr, level=settings.log_level, format=_LOG_FORMAT, colorize=True)
+logger.add(sys.stderr, level=settings.log_level, format=_LOG_FORMAT, colorize=sys.stderr.isatty())
 logger.add(_log_sink, level="INFO", format="{time:HH:mm:ss} | {level: <8} | {name} — {message}")
 logger.add(
     _log_dir / "jarvis.log",
