@@ -32,6 +32,7 @@ bundle/
 # ── Données personnelles de Jarvis ───────────────────────────
 memory_data/
 workspace/
+logs/
 vision_data/faces/
 
 # ── Skills générées par le Lab (artefacts run, regénérables) ─

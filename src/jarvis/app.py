@@ -57,6 +57,7 @@ from jarvis.interfaces.api.widgets import router as widgets_router
 from jarvis.interfaces.channels.setup import setup_channels
 from jarvis.interfaces.channels.telegram_bot import get_telegram_channel
 from jarvis.kernel.paths import UI_STATIC_DIR
+from jarvis.kernel.paths import PROJECT_ROOT
 from jarvis.kernel.settings import settings
 from jarvis.providers.audio.clap_detector import ClapDetector
 from jarvis.providers.memory.search import FTSIndex
@@ -69,10 +70,22 @@ load_dotenv()
 _LOG_FORMAT = (
     "<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan> — {message}"
 )
+_LOG_FORMAT_FILE = "{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name} — {message}"
+
+_log_dir = (PROJECT_ROOT / settings.log_dir).resolve()
+_log_dir.mkdir(parents=True, exist_ok=True)
 
 logger.remove()
 logger.add(sys.stderr, level=settings.log_level, format=_LOG_FORMAT, colorize=True)
 logger.add(_log_sink, level="INFO", format="{time:HH:mm:ss} | {level: <8} | {name} — {message}")
+logger.add(
+    _log_dir / "jarvis.log",
+    level=settings.log_level,
+    format=_LOG_FORMAT_FILE,
+    rotation="10 MB",
+    retention=5,
+    encoding="utf-8",
+)
 
 
 async def _fts_rebuild_if_empty(fts_index: FTSIndex, sessions_dir: Path) -> None:

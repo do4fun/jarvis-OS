@@ -16,20 +16,21 @@ _TIMEOUT = 20.0
 _MAX_TEXT_LEN = 8000  # chars max retournés au LLM
 _MAX_LINKS = 25
 
+
 # Hôtes internes/locaux bloqués — jamais d'accès au réseau interne
-_BLOCKED_HOST_RE = re.compile(
-    r"^("
-    r"localhost"
-    r"|127\.\d{1,3}\.\d{1,3}\.\d{1,3}"
-    r"|0\.0\.0\.0"
-    r"|10\.\d{1,3}\.\d{1,3}\.\d{1,3}"
-    r"|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}"
-    r"|192\.168\.\d{1,3}\.\d{1,3}"
-    r"|::1"
-    r"|.*\.local"
-    r")$",
-    re.IGNORECASE,
-)
+#_BLOCKED_HOST_RE = re.compile(
+#    r"^("
+#    r"localhost"
+#    r"|127\.\d{1,3}\.\d{1,3}\.\d{1,3}"
+#    r"|0\.0\.0\.0"
+#    r"|10\.\d{1,3}\.\d{1,3}\.\d{1,3}"
+#    r"|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}"
+#    r"|192\.168\.\d{1,3}\.\d{1,3}"
+#    r"|::1"
+#    r"|.*\.local"
+#    r")$",
+#    re.IGNORECASE,
+#)
 
 _HEADERS = {
     "User-Agent": (

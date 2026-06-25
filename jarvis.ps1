@@ -124,7 +124,13 @@ function Start-BackgroundProcess {
 
 function Invoke-JarvisRun {
     $apiPort = [int](Get-DotEnvValue -Key "PORT" -Default "8000")
-    $logDir = Join-Path $env:TEMP "jarvis"
+    $rawLogDir = Get-DotEnvValue -Key "LOG_DIR" -Default "logs"
+    # Résout le chemin relatif à la racine du projet ($PSScriptRoot = racine du repo).
+    if ([System.IO.Path]::IsPathRooted($rawLogDir)) {
+        $logDir = $rawLogDir
+    } else {
+        $logDir = Join-Path $PSScriptRoot $rawLogDir
+    }
     New-Item -ItemType Directory -Path $logDir -Force | Out-Null
     $lkLog = Join-Path $logDir "livekit.log"
     $apiLog = Join-Path $logDir "api.log"

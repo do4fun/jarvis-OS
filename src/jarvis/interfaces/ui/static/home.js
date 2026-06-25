@@ -57,6 +57,140 @@
   let _orb = null;
   let _currentState = "idle";
 
+  // ── Overlay — formes visuelles d'écoute (VAD) ────────────────────────
+  // Injecte une fois les keyframes CSS communes à toutes les formes overlay.
+  (function _injectOrbOverlayCSS() {
+    if (document.getElementById('_orb-overlay-css')) return;
+    const s = document.createElement('style');
+    s.id = '_orb-overlay-css';
+    s.textContent = [
+      '.orb-overlay{position:fixed;pointer-events:none;display:flex;align-items:center;',
+      'justify-content:center;z-index:9;opacity:0;transition:opacity .3s ease;}',
+      '.orb-overlay.visible{opacity:1;}',
+
+      /* waves — cercles concentriques qui s'expandent */
+      '@keyframes _ow{0%{transform:scale(.35);opacity:.75}100%{transform:scale(3);opacity:0}}',
+      '.orb-overlay--waves .orb-wave{position:absolute;width:90px;height:90px;',
+      'margin:-45px 0 0 -45px;top:50%;left:50%;border-radius:50%;',
+      'border:1.5px solid var(--oa,#4a9eff);',
+      'animation:_ow 1.9s ease-out infinite;}',
+
+      /* morph — blob géométrique CSS */
+      '@keyframes _om{0%,100%{border-radius:60% 40% 30% 70%/60% 30% 70% 40%}',
+      '33%{border-radius:30% 60% 70% 40%/50% 60% 30% 60%}',
+      '66%{border-radius:50% 40% 60% 30%/40% 70% 50% 40%}}',
+      '.orb-overlay--morph .orb-shape{width:130px;height:130px;',
+      'background:var(--oa,#4a9eff);opacity:.14;position:absolute;',
+      'animation:_om 4s ease-in-out infinite;}',
+
+      /* spectrum — barres FFT synthétiques */
+      '@keyframes _osa{0%,100%{height:18%}50%{height:88%}}',
+      '@keyframes _osb{0%,100%{height:44%}50%{height:28%}}',
+      '.orb-overlay--spectrum{gap:5px;align-items:center;}',
+      '.orb-overlay--spectrum .orb-bar{width:5px;border-radius:3px;',
+      'background:var(--oa,#4a9eff);opacity:.65;min-height:6px;',
+      'animation-timing-function:ease-in-out;animation-iteration-count:infinite;}',
+
+      /* blob — forme organique lente */
+      '@keyframes _ob{0%,100%{border-radius:64% 36% 27% 73%/55% 58% 42% 45%}',
+      '33%{border-radius:43% 57% 70% 30%/50% 45% 55% 50%}',
+      '66%{border-radius:55% 45% 35% 65%/40% 65% 35% 60%}}',
+      '.orb-overlay--blob .orb-shape{width:155px;height:155px;',
+      'background:var(--oa,#4a9eff);opacity:.11;position:absolute;',
+      'animation:_ob 6s ease-in-out infinite;}',
+
+      /* fibonacci — spirale SVG tracée */
+      '@keyframes _of{to{stroke-dashoffset:0}}',
+      '.orb-overlay--fibonacci .orb-spiral{fill:none;stroke:var(--oa,#4a9eff);',
+      'stroke-width:1.5;opacity:.55;stroke-dasharray:780;stroke-dashoffset:780;',
+      'animation:_of 2.8s ease forwards;}',
+    ].join('');
+    document.head.appendChild(s);
+  }());
+
+  let _listeningOverlay = null;
+
+  function _accentColor() {
+    try {
+      const J = window.Jarvis;
+      if (J && J.THEMES && J.currentTheme) {
+        const t = J.THEMES[J.currentTheme()];
+        if (t && t.css) return t.css;
+      }
+    } catch (_) {}
+    return '#4a9eff';
+  }
+
+  function _spiralPolylinePoints() {
+    const pts = [];
+    for (let i = 0; i <= 260; i++) {
+      const a = (i / 260) * 3.8 * Math.PI * 2 - Math.PI / 2;
+      const r = (i / 260) * 74;
+      pts.push((100 + r * Math.cos(a)).toFixed(1) + ',' + (100 + r * Math.sin(a)).toFixed(1));
+    }
+    return pts.join(' ');
+  }
+
+  function _buildOverlayContent(form) {
+    switch (form) {
+      case 'waves':
+        return [0, 0.55, 1.1, 1.65].map(d =>
+          `<div class="orb-wave" style="animation-delay:${d}s"></div>`).join('');
+      case 'morph':
+        return '<div class="orb-shape"></div>';
+      case 'spectrum': {
+        const delays = [.08, .22, .0, .16, .06, .19, .03, .13, .10];
+        return delays.map((d, i) =>
+          `<div class="orb-bar" style="animation-name:${i % 2 ? '_osb' : '_osa'};` +
+          `animation-duration:${0.6 + (i % 3) * 0.12}s;animation-delay:${d}s;height:${22 + i * 6}%"></div>`
+        ).join('');
+      }
+      case 'blob':
+        return '<div class="orb-shape"></div>';
+      case 'fibonacci':
+        return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%">` +
+          `<polyline class="orb-spiral" points="${_spiralPolylinePoints()}"/></svg>`;
+      default:
+        return '';
+    }
+  }
+
+  function _positionOverlay(el) {
+    if (!el) return;
+    const canvas = document.getElementById('orb-canvas');
+    if (!canvas) return;
+    const r = canvas.getBoundingClientRect();
+    el.style.left   = r.left   + 'px';
+    el.style.top    = r.top    + 'px';
+    el.style.width  = r.width  + 'px';
+    el.style.height = r.height + 'px';
+  }
+
+  function _showListeningOverlay() {
+    const form = (window.JARVIS_ORB_LISTENING_FORM || 'pulse').toLowerCase();
+    const OVERLAY_FORMS = ['waves', 'morph', 'spectrum', 'blob', 'fibonacci'];
+    if (!OVERLAY_FORMS.includes(form)) return;
+    if (_listeningOverlay) { _listeningOverlay.remove(); _listeningOverlay = null; }
+    const el = document.createElement('div');
+    el.className = 'orb-overlay orb-overlay--' + form;
+    el.style.setProperty('--oa', _accentColor());
+    el.innerHTML = _buildOverlayContent(form);
+    document.body.appendChild(el);
+    _positionOverlay(el);
+    _listeningOverlay = el;
+    requestAnimationFrame(() => el.classList.add('visible'));
+  }
+
+  function _hideListeningOverlay() {
+    if (!_listeningOverlay) return;
+    const el = _listeningOverlay;
+    _listeningOverlay = null;
+    el.classList.remove('visible');
+    setTimeout(() => el.remove(), 350);
+  }
+
+  window.addEventListener('resize', () => _positionOverlay(_listeningOverlay));
+
   function setOrbState(state) {
     _currentState = state;
     const meta = STATE_DOTS[state] || STATE_DOTS.idle;
@@ -65,6 +199,8 @@
     if (dot) dot.className = "status-dot " + meta.cls;
     if (lbl) lbl.textContent = meta.label;
     if (_orb) _orb.setState(state);
+    if (state === 'listening') { _showListeningOverlay(); }
+    else                       { _hideListeningOverlay(); }
   }
   // Exposé pour les scripts externes (ex. voice_livekit.js pilote l'orbe via ça).
   window.__jarvisSetOrbState = setOrbState;

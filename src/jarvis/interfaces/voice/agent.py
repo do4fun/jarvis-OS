@@ -62,6 +62,9 @@ warnings.filterwarnings("ignore", category=UserWarning, module="pkg_resources")
 try:
     from loguru import logger as _loguru
 
+    _log_dir = (PROJECT_ROOT / os.getenv("LOG_DIR", "logs")).resolve()
+    _log_dir.mkdir(parents=True, exist_ok=True)
+
     _loguru.remove()
     _loguru.add(
         sys.stderr,
@@ -71,6 +74,14 @@ try:
             " | <cyan>{name}</cyan> — {message}"
         ),
         colorize=True,
+    )
+    _loguru.add(
+        _log_dir / "voice.log",
+        level="DEBUG",
+        format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name} — {message}",
+        rotation="10 MB",
+        retention=5,
+        encoding="utf-8",
     )
 except Exception:
     pass
@@ -546,6 +557,34 @@ async def entrypoint(ctx: object) -> None:
     )
 
     agent = JarvisVoiceAgent(instructions=instructions, tools=tools)
+
+    # Feedback UI immédiat : on écoute les events de session LiveKit et on pousse
+    # l'état vers l'orbe via _voice_broadcast dès que le VAD détecte la voix.
+    # user_state "speaking" est émis ~50 ms après le début de la parole — bien avant
+    # que le STT ou le LLM aient répondu.
+    _AGENT_ORB_MAP = {
+        "thinking": "thinking",
+        "speaking": "speaking",
+        "listening": "listening",
+        "idle": "idle",
+    }
+
+    @session.on("user_state_changed")
+    def _on_user_state(ev: object) -> None:
+        old = getattr(ev, "old_state", "?")
+        new = getattr(ev, "new_state", "?")
+        logger.debug("[VAD] user_state  {} → {}", old, new)
+        if new == "speaking":
+            _voice_broadcast({"type": "voice_state", "state": "listening"})
+
+    @session.on("agent_state_changed")
+    def _on_agent_state(ev: object) -> None:
+        old = getattr(ev, "old_state", "?")
+        new = getattr(ev, "new_state", "?")
+        logger.debug("[VAD] agent_state {} → {}", old, new)
+        orb = _AGENT_ORB_MAP.get(new, "")
+        if orb:
+            _voice_broadcast({"type": "voice_state", "state": orb})
 
     await session.start(
         room=ctx.room,

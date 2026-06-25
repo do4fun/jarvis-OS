@@ -13,3 +13,7 @@
 # impulsion_stats:
 #   command: ["python", "scripts/impulsion_stats.py"]
 #   description: "Stats Instagram Impulsion du jour"
+#
+ open_cmd:
+   command: ["bash", "cmd.exe"]
+   description: "Ouvrir une invite de commande"

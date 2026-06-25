@@ -495,6 +495,8 @@ class Settings(BaseSettings):
 
     # ── Logging ───────────────────────────────────────────────
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = Field(default="INFO")
+    log_dir: str = Field(default="logs", description="Répertoire des fichiers de log (relatif à PROJECT_ROOT ou absolu).")
+    orb_listening_form: str = Field(default="pulse", description="Forme visuelle de l'orbe quand l'utilisateur parle (VAD actif). pulse|waves|orbital|morph|spectrum|blob|particles|fibonacci")
 
 
 # Singleton — importé partout via `from config.settings import settings`

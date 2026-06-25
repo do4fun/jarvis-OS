@@ -46,6 +46,7 @@ SKILLS_CANDIDATES_DIR: Path = SKILLS_DATA_DIR / "candidates"
 VISION_DATA_DIR: Path = PROJECT_ROOT / "vision_data"
 FACES_DIR: Path = VISION_DATA_DIR / "faces"
 WORKSPACE_DIR: Path = PROJECT_ROOT / "workspace"
+LOGS_DIR: Path = PROJECT_ROOT / "logs"
 
 # ── Assets / code-as-data (trackés en git) ────────────────────────────────
 PROMPTS_DIR: Path = PROJECT_ROOT / "prompts"

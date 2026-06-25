@@ -240,11 +240,27 @@
           targetElectronRate = 0;
           targetGlow   = 0.42;
           break;
-        case "listening":
-          targetRadius = 27; targetSpeed = 0.26; targetBright = 0.80;
-          targetSize = 0.61; targetLineAmount = 0.28; targetElectronRate = 0;
-          targetGlow = 0.54;
+        case "listening": {
+          const _lf = (window.JARVIS_ORB_LISTENING_FORM || 'pulse').toLowerCase();
+          if (_lf === 'orbital') {
+            // Points orbitaux : rayon serré, connexions visibles, légères étincelles
+            targetRadius = 24; targetSpeed = 0.34; targetBright = 0.82;
+            targetSize = 0.60; targetLineAmount = 0.52; targetElectronRate = 0.006;
+            targetGlow = 0.60;
+          } else if (_lf === 'particles') {
+            // Particules qui convergent : rayon réduit, forte densité d'électrons
+            targetRadius = 21; targetSpeed = 0.30; targetBright = 0.84;
+            targetSize = 0.57; targetLineAmount = 0.40; targetElectronRate = 0.022;
+            targetGlow = 0.58;
+          } else {
+            // pulse / waves / morph / spectrum / blob / fibonacci — base orbe identique,
+            // la différence visuelle est portée par l'overlay CSS/SVG (home.js)
+            targetRadius = 27; targetSpeed = 0.26; targetBright = 0.80;
+            targetSize = 0.61; targetLineAmount = 0.28; targetElectronRate = 0;
+            targetGlow = 0.54;
+          }
           break;
+        }
         case "thinking":
           targetRadius = 25; targetSpeed = 0.38; targetBright = 0.85;
           targetSize = 0.57; targetLineAmount = 0.72; targetElectronRate = 0.012;
