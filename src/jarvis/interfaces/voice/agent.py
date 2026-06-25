@@ -109,6 +109,9 @@ except Exception:
 
 
 logger = logging.getLogger("jarvis-voice")
+# Applique LOG_LEVEL (.env) sur ce logger : le CLI livekit passe --log-level info
+# qui fixe le root logger à INFO et écrase les DEBUG — on corrige ici explicitement.
+logger.setLevel(getattr(logging, settings.log_level.upper(), logging.INFO))
 
 # ─── Prompt système vocal (base) ───────────────────────────────────────────────
 
