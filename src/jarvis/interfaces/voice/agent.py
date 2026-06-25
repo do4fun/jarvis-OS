@@ -35,6 +35,21 @@ from livekit.plugins import deepgram, elevenlabs, silero
 from livekit.plugins import google as lk_google
 from livekit.plugins.google.beta import gemini_tts
 
+
+# Plugins optionnels : LiveKit exige register_plugin() sur le main thread.
+# On force l'import ici (module chargé sur le main thread au démarrage)
+# pour que les imports lazy dans _build_voice_llm/_build_voice_stt
+# trouvent ces modules déjà dans sys.modules et ne rappellent pas register_plugin.
+try:
+    import livekit.plugins.anthropic  # noqa: F401
+except ImportError:
+    pass
+try:
+    import livekit.plugins.openai  # noqa: F401
+except ImportError:
+    pass
+
+
 from jarvis.bootstrap import build
 from jarvis.capabilities.skills.registry import SkillRegistry
 from jarvis.kernel.paths import PROJECT_ROOT  # noqa: E402
