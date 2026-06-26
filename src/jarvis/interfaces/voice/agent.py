@@ -422,12 +422,11 @@ def _build_voice_elevenlabs(env: dict) -> object:
     quebec = env.get("QUEBEC_MODE", "false").strip().lower() in ("true", "1", "yes")
     voice_id = env.get("QUEBEC_VOICE_ID") if quebec else env.get("ELEVENLABS_VOICE_ID", "")
     model = "eleven_multilingual_v2" if quebec else env.get("ELEVENLABS_MODEL", "eleven_turbo_v2_5")
+    api_key = env.get("ELEVENLABS_API_KEY", os.getenv("ELEVENLABS_API_KEY", "")) or None
     return elevenlabs.TTS(
         model=model,
         voice_id=voice_id,
-        api_key=env.get("ELEVENLABS_API_KEY", os.getenv("ELEVENLABS_API_KEY", "")),
-        encoding="pcm_24000",
-        chunk_length_schedule=[50, 90, 160, 250],
+        **({"api_key": api_key} if api_key else {}),
     )
 
 
@@ -597,7 +596,7 @@ async def entrypoint(ctx: object) -> None:
     def _on_user_state(ev: object) -> None:
         old = getattr(ev, "old_state", "?")
         new = getattr(ev, "new_state", "?")
-        logger.debug("[VAD] user_state  {} → {}", old, new)
+        logger.debug("[VAD] user_state  %s → %s", old, new)
         if new == "speaking":
             _voice_broadcast({"type": "voice_state", "state": "listening"})
 
@@ -605,7 +604,7 @@ async def entrypoint(ctx: object) -> None:
     def _on_agent_state(ev: object) -> None:
         old = getattr(ev, "old_state", "?")
         new = getattr(ev, "new_state", "?")
-        logger.debug("[VAD] agent_state {} → {}", old, new)
+        logger.debug("[VAD] agent_state %s → %s", old, new)
         orb = _AGENT_ORB_MAP.get(new, "")
         if orb:
             _voice_broadcast({"type": "voice_state", "state": orb})
