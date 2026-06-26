@@ -473,13 +473,19 @@ def _build_voice_tts(env: dict) -> object:
         logger.info("TTS pipeline = OpenAI TTS (%s)", voice)
         return lk_openai.TTS(voice=voice, **({"api_key": openai_key} if openai_key else {}))
 
-    # elevenlabs / piper / inconnu : on prend la première clé disponible
     if provider == "piper":
-        logger.info(
-            "TTS_PROVIDER=piper → TTS local uniquement. "
-            "Recherche d'un TTS streaming pour le pipeline LiveKit…"
+        from jarvis.interfaces.voice.piper_tts import PiperTTS
+
+        model = env.get("PIPER_MODEL_PATH", os.getenv("PIPER_MODEL_PATH", "models/piper/fr_FR-upmc-medium.onnx"))
+        model_path = str((PROJECT_ROOT / model).resolve())
+        if Path(model_path).exists():
+            logger.info("TTS pipeline = Piper local (%s)", Path(model_path).name)
+            return PiperTTS(model_path=model_path)
+        logger.warning(
+            "Modèle Piper introuvable (%s) — repli sur TTS cloud.", model_path
         )
 
+    # elevenlabs / inconnu : on prend la première clé disponible
     if eleven_key:
         logger.info("TTS pipeline = ElevenLabs")
         return _build_voice_elevenlabs(env)
