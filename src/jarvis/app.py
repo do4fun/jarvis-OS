@@ -93,7 +93,7 @@ async def _fts_rebuild_if_empty(fts_index: FTSIndex, sessions_dir: Path) -> None
         await fts_index.rebuild(sessions_dir)
 
 
-async def _watch_dotenv(env_path: Path) -> None:
+async def _watch_dotenv(env_path: Path, proactive_queue: object) -> None:
     """Surveille .env et recharge les settings dès que le fichier est modifié."""
     last_mtime: float = env_path.stat().st_mtime if env_path.exists() else 0.0
     while True:
@@ -104,8 +104,13 @@ async def _watch_dotenv(env_path: Path) -> None:
             continue
         if mtime != last_mtime:
             last_mtime = mtime
+            old_orb_form = settings.orb_listening_form
             reload_settings()
             logger.info("Settings rechargés depuis .env")
+            if settings.orb_listening_form != old_orb_form:
+                proactive_queue.broadcast_event(  # type: ignore[attr-defined]
+                    {"type": "config_update", "orb_listening_form": settings.orb_listening_form}
+                )
 
 
 # ── Lifespan ─────────────────────────────────────────────────
@@ -215,7 +220,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         asyncio.create_task(clap_detector.start(), name="clap-detector")
 
     worker_task = asyncio.create_task(container.worker.run_loop(), name="background-worker")
-    dotenv_task = asyncio.create_task(_watch_dotenv(PROJECT_ROOT / ".env"), name="dotenv-watcher")
+    dotenv_task = asyncio.create_task(
+        _watch_dotenv(PROJECT_ROOT / ".env", container.proactive_queue), name="dotenv-watcher"
+    )
     container.scheduler.start()
 
     # Routines

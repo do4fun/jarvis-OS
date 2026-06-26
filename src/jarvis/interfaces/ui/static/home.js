@@ -258,6 +258,9 @@
     if (msg.type === "tts_done" || msg.type === "done") {
       setTimeout(() => setOrbState("idle"), 1200);
     }
+    if (msg.type === "config_update" && msg.orb_listening_form !== undefined) {
+      window.JARVIS_ORB_LISTENING_FORM = msg.orb_listening_form;
+    }
   });
 
   // ── Controls (pictos haut-gauche) ─────────────────────────────────
