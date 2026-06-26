@@ -433,23 +433,27 @@ def _build_voice_elevenlabs(env: dict) -> object:
 def _build_voice_tts(env: dict) -> object:
     """TTS du pipeline LiveKit, sélectionné via TTS_PROVIDER.
 
-    'gemini'     → voix Google naturelle, MAIS le free tier est très limité
-                   (10 req/min) → enveloppé dans un FallbackAdapter vers
-                   ElevenLabs : dès que Gemini renvoie 429 (quota), LiveKit
-                   bascule sur ElevenLabs sans couper la conversation.
-    'elevenlabs' → ElevenLabs seul (défaut).
-    'piper'      → pas de plugin LiveKit temps réel → repli ElevenLabs.
+    Note : 'piper' est un TTS local pour le pipeline in-house uniquement.
+    LiveKit nécessite un TTS streaming — si TTS_PROVIDER=piper, on
+    utilise la première clé API disponible (ElevenLabs → OpenAI → Gemini).
+
+    'gemini'     → Gemini TTS + repli ElevenLabs si la clé est présente.
+    'elevenlabs' → ElevenLabs seul.
+    'openai'     → OpenAI TTS seul.
+    'piper'/autre → repli automatique : ElevenLabs > OpenAI > Gemini.
     """
     provider = env.get("TTS_PROVIDER", "elevenlabs").strip().lower()
-    has_eleven = bool(env.get("ELEVENLABS_API_KEY", os.getenv("ELEVENLABS_API_KEY", "")))
+    eleven_key = env.get("ELEVENLABS_API_KEY", os.getenv("ELEVENLABS_API_KEY", "")) or None
+    openai_key = env.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY", "")) or None
+    google_key = env.get("GOOGLE_API_KEY", os.getenv("GOOGLE_API_KEY", "")) or None
 
     if provider == "gemini":
         gemini = gemini_tts.TTS(
             model=env.get("GEMINI_TTS_MODEL", "gemini-2.5-flash-preview-tts"),
             voice_name=env.get("GEMINI_TTS_VOICE", "Kore"),
-            api_key=env.get("GOOGLE_API_KEY", os.getenv("GOOGLE_API_KEY", "")),
+            api_key=google_key or "",
         )
-        if has_eleven:
+        if eleven_key:
             logger.info(
                 "TTS pipeline = Gemini (%s / %s) + repli ElevenLabs sur quota 429",
                 env.get("GEMINI_TTS_MODEL", "gemini-2.5-flash-preview-tts"),
@@ -462,8 +466,44 @@ def _build_voice_tts(env: dict) -> object:
         )
         return gemini
 
-    logger.info("TTS pipeline = ElevenLabs")
-    return _build_voice_elevenlabs(env)
+    if provider == "openai":
+        from livekit.plugins import openai as lk_openai
+
+        voice = env.get("TTS_VOICE", "alloy")
+        logger.info("TTS pipeline = OpenAI TTS (%s)", voice)
+        return lk_openai.TTS(voice=voice, **({"api_key": openai_key} if openai_key else {}))
+
+    # elevenlabs / piper / inconnu : on prend la première clé disponible
+    if provider == "piper":
+        logger.info(
+            "TTS_PROVIDER=piper → TTS local uniquement. "
+            "Recherche d'un TTS streaming pour le pipeline LiveKit…"
+        )
+
+    if eleven_key:
+        logger.info("TTS pipeline = ElevenLabs")
+        return _build_voice_elevenlabs(env)
+
+    if openai_key:
+        from livekit.plugins import openai as lk_openai
+
+        voice = env.get("TTS_VOICE", "alloy")
+        logger.info("TTS pipeline = OpenAI TTS (%s) — repli (ELEVENLABS_API_KEY absente)", voice)
+        return lk_openai.TTS(voice=voice, api_key=openai_key)
+
+    if google_key:
+        logger.info("TTS pipeline = Gemini TTS — repli (ElevenLabs et OpenAI absents)")
+        return gemini_tts.TTS(
+            model=env.get("GEMINI_TTS_MODEL", "gemini-2.5-flash-preview-tts"),
+            voice_name=env.get("GEMINI_TTS_VOICE", "Kore"),
+            api_key=google_key,
+        )
+
+    raise ValueError(
+        "Aucun TTS disponible pour le pipeline vocal LiveKit. "
+        "Renseigne au moins une clé : ELEVENLABS_API_KEY, OPENAI_API_KEY ou GOOGLE_API_KEY. "
+        "TTS_PROVIDER=piper est réservé au pipeline in-house (non LiveKit)."
+    )
 
 
 def _build_voice_llm(env: dict) -> object:
