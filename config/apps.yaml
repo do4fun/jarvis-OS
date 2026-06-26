@@ -1,0 +1,55 @@
+# Catalogue des applications Windows lançables par Jarvis
+# tier safe    → lancé immédiatement
+# tier confirm → demande confirmation vocale avant lancement
+# paths        → répertoires supplémentaires si l'exe n'est pas dans PATH
+
+notepad:
+  command: ["notepad.exe"]
+  description: "Bloc-notes Windows"
+  tier: safe
+
+notepad_plus:
+  command: ["notepad++.exe"]
+  description: "Notepad++"
+  tier: safe
+  paths:
+    - "C:\\apps\\Notepad++"
+
+paint:
+  command: ["mspaint.exe"]
+  description: "Paint Windows"
+  tier: safe
+
+explorer:
+  command: ["explorer.exe"]
+  description: "Explorateur de fichiers Windows"
+  tier: safe
+
+calculator:
+  command: ["calc.exe"]
+  description: "Calculatrice Windows"
+  tier: safe
+
+wordpad:
+  command: ["wordpad.exe"]
+  description: "WordPad"
+  tier: safe
+
+powershell:
+  command: ["powershell.exe", "-NoProfile"]
+  description: "Terminal PowerShell"
+  tier: confirm
+  paths:
+    - "C:\\Windows\\System32\\WindowsPowerShell\\v1.0"
+
+cmd:
+  command: ["cmd.exe"]
+  description: "Invite de commandes Windows"
+  tier: confirm
+
+chrome:
+  command: ["chrome.exe"]
+  description: "Google Chrome"
+  tier: safe
+  paths:
+    - "C:\\Program Files\\Google\\Chrome\\Application"

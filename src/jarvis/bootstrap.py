@@ -57,6 +57,7 @@ from jarvis.capabilities.tools.skills import SkillCreateTool, SkillImproveTool, 
 from jarvis.capabilities.tools.spotify import SpotifyTool
 from jarvis.capabilities.tools.subagent import ScriptRPCTool, SpawnSubagentTool
 from jarvis.capabilities.tools.vision import VisionTool
+from jarvis.capabilities.tools.launch_app import LaunchAppTool
 from jarvis.capabilities.tools.weather import WeatherTool
 from jarvis.engine.agent import Agent
 from jarvis.engine.approval_checker import ApprovalChecker
@@ -311,6 +312,7 @@ def build(
         ExecutePresetTool(tool_registry=tool_registry, tts_engine=tts_engine),
         CrossSessionRecallTool(fts_index=fts_index, vector_index=vector_index),
         RunTestsTool(),
+        LaunchAppTool(),
     )
     tool_registry.replace_skill_tools(*skill_registry.get_all_tools())
 
