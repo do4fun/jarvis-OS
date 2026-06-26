@@ -51,6 +51,7 @@ from jarvis.capabilities.tools.memory import (
 from jarvis.capabilities.tools.notion import NotionTasksTool
 from jarvis.capabilities.tools.preset import ExecutePresetTool
 from jarvis.capabilities.tools.registry import ToolRegistry
+from jarvis.capabilities.tools.run_tests import RunTestsTool
 from jarvis.capabilities.tools.show_view import ShowViewTool
 from jarvis.capabilities.tools.skills import SkillCreateTool, SkillImproveTool, SkillListTool
 from jarvis.capabilities.tools.spotify import SpotifyTool
@@ -309,6 +310,7 @@ def build(
         GmailListTool(credentials_path=_google_creds, token_path=_gmail_token),
         ExecutePresetTool(tool_registry=tool_registry, tts_engine=tts_engine),
         CrossSessionRecallTool(fts_index=fts_index, vector_index=vector_index),
+        RunTestsTool(),
     )
     tool_registry.replace_skill_tools(*skill_registry.get_all_tools())
 
