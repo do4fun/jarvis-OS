@@ -104,13 +104,17 @@ async def _watch_dotenv(env_path: Path, proactive_queue: object) -> None:
             continue
         if mtime != last_mtime:
             last_mtime = mtime
-            old_orb_form = settings.orb_listening_form
+            old_listening = settings.orb_listening_form
+            old_thinking = settings.orb_thinking_form
             reload_settings()
             logger.info("Settings rechargés depuis .env")
-            if settings.orb_listening_form != old_orb_form:
-                proactive_queue.broadcast_event(  # type: ignore[attr-defined]
-                    {"type": "config_update", "orb_listening_form": settings.orb_listening_form}
-                )
+            update: dict = {}
+            if settings.orb_listening_form != old_listening:
+                update["orb_listening_form"] = settings.orb_listening_form
+            if settings.orb_thinking_form != old_thinking:
+                update["orb_thinking_form"] = settings.orb_thinking_form
+            if update:
+                proactive_queue.broadcast_event({"type": "config_update", **update})  # type: ignore[attr-defined]
 
 
 # ── Lifespan ─────────────────────────────────────────────────

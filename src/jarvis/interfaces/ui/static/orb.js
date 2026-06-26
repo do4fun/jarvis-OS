@@ -261,11 +261,27 @@
           }
           break;
         }
-        case "thinking":
-          targetRadius = 25; targetSpeed = 0.38; targetBright = 0.85;
-          targetSize = 0.57; targetLineAmount = 0.72; targetElectronRate = 0.012;
-          targetGlow = 0.68;
+        case "thinking": {
+          const thinkForm = window.JARVIS_ORB_THINKING_FORM || "pulse";
+          if (thinkForm === "orbital") {
+            // orbital — orbites rapides, lignes denses, très actif
+            targetRadius = 23; targetSpeed = 0.45; targetBright = 0.90;
+            targetSize = 0.55; targetLineAmount = 0.80; targetElectronRate = 0.020; targetGlow = 0.72;
+          } else if (thinkForm === "particles") {
+            // particles — nuage de points, beaucoup d'électrons
+            targetRadius = 20; targetSpeed = 0.42; targetBright = 0.88;
+            targetSize = 0.52; targetLineAmount = 0.35; targetElectronRate = 0.030; targetGlow = 0.70;
+          } else if (thinkForm === "wave") {
+            // wave — contemplatif, plus lent, lignes moyennes
+            targetRadius = 22; targetSpeed = 0.28; targetBright = 0.82;
+            targetSize = 0.54; targetLineAmount = 0.50; targetElectronRate = 0.008; targetGlow = 0.65;
+          } else {
+            // pulse (défaut) — valeurs originales thinking
+            targetRadius = 25; targetSpeed = 0.38; targetBright = 0.85;
+            targetSize = 0.57; targetLineAmount = 0.72; targetElectronRate = 0.012; targetGlow = 0.68;
+          }
           break;
+        }
         case "speaking":
           targetRadius = 27; targetSpeed = 0.20; targetBright = 0.86;
           targetSize = 0.63; targetLineAmount = 0.48; targetElectronRate = 0;

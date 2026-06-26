@@ -17,6 +17,8 @@ from livekit.api import (
 )
 from pydantic import BaseModel
 
+from loguru import logger
+
 from jarvis.engine.background.notifications import broadcast_event
 from jarvis.engine.background.worker import BackgroundTask
 from jarvis.engine.router import RouteEnum
@@ -97,6 +99,7 @@ async def voice_generate(body: VoiceGenerateRequest, request: Request) -> Stream
     consolidation = request.app.state.consolidation
     auto_dream = request.app.state.auto_dream
 
+    logger.debug("[ORB] voice/generate reçu → orb thinking (form={})", settings.orb_thinking_form)
     voice_msg = f"{body.message}\n[voix]"
 
     session, route, response = await gateway.handle(
@@ -124,6 +127,7 @@ async def voice_generate(body: VoiceGenerateRequest, request: Request) -> Stream
             full = "Désolé, j'ai eu un souci."
             yield full
 
+        logger.debug("[ORB] voice/generate stream terminé → orb idle")
         session.add_message("assistant", full)
 
         if route is RouteEnum.BACKGROUND:
