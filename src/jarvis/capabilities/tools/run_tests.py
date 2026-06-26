@@ -21,6 +21,34 @@ def _strip_ansi(text: str) -> str:
     return _ANSI_RE.sub("", text)
 
 
+def _find_pytest_cmd() -> list[str] | None:
+    """Trouve la commande pytest disponible, en privilégiant le venv dev.
+
+    Ordre de préférence :
+    1. .venv/Scripts/pytest.exe  — venv dev Windows (uv sync --group dev)
+    2. .venv/bin/pytest           — venv dev Linux/macOS
+    3. sys.executable -m pytest  — Python courant (bundle) si pytest installé
+    Retourne None si pytest est introuvable partout.
+    """
+    candidates_exe = [
+        PROJECT_ROOT / ".venv" / "Scripts" / "pytest.exe",  # Windows dev
+        PROJECT_ROOT / ".venv" / "bin" / "pytest",           # Unix dev
+    ]
+    for exe in candidates_exe:
+        if exe.exists():
+            return [str(exe)]
+
+    # Tente sys.executable (bundle ou autre venv actif)
+    try:
+        import importlib.util
+        if importlib.util.find_spec("pytest") is not None:
+            return [sys.executable, "-m", "pytest"]
+    except Exception:
+        pass
+
+    return None
+
+
 def _parse_pytest_summary(output: str) -> str:
     """Extrait la ligne de résumé pytest (ex: '3 passed, 1 failed in 2.45s')."""
     for line in reversed(output.splitlines()):
@@ -81,7 +109,17 @@ class RunTestsTool(Tool):
             listing = "\n".join(f"  - {f}" for f in files)
             return ToolResult(content=f"Fichiers de tests disponibles ({len(files)}) :\n{listing}")
 
-        # Resolve target
+        pytest_cmd = _find_pytest_cmd()
+        if pytest_cmd is None:
+            return ToolResult(
+                content=(
+                    "pytest introuvable. Lance `uv sync --group dev` depuis la racine du projet "
+                    "pour installer les dépendances de développement."
+                ),
+                is_error=True,
+            )
+
+        # Resolve target file
         target: Path | None = None
         if test_file:
             candidate = _TESTS_DIR / (test_file if test_file.endswith(".py") else test_file + ".py")
@@ -94,7 +132,7 @@ class RunTestsTool(Tool):
             target = candidate
 
         cmd = [
-            sys.executable, "-m", "pytest",
+            *pytest_cmd,
             "--tb=short",
             "-v",
             "--no-header",
@@ -120,7 +158,6 @@ class RunTestsTool(Tool):
         summary = _parse_pytest_summary(raw)
         success = proc.returncode == 0
 
-        # Keep only the most informative lines when output is long
         if len(raw) > _MAX_OUTPUT_CHARS:
             raw = raw[:_MAX_OUTPUT_CHARS] + f"\n… [tronqué — {len(raw)} caractères au total]"
 
