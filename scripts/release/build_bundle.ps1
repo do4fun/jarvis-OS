@@ -87,7 +87,12 @@ if (-not (Test-Path $piperOnnx)) {
 Write-Host "[6/6] Download livekit-server" -ForegroundColor Cyan
 $lkTarget = Join-Path $binDir "livekit-server.exe"
 if (-not (Test-Path $lkTarget)) {
-    $release = Invoke-RestMethod -Uri "https://api.github.com/repos/livekit/livekit/releases/latest" -Headers @{ "User-Agent" = "jarvis-bundle" }
+    # Authentifie l'appel API GitHub si un token est présent (CI) : les runners
+    # partagent des IP très sollicitées et la limite anonyme (60/h) y est vite
+    # atteinte. En local (pas de GITHUB_TOKEN) -> appel anonyme comme avant.
+    $lkHeaders = @{ "User-Agent" = "jarvis-bundle" }
+    if ($env:GITHUB_TOKEN) { $lkHeaders["Authorization"] = "Bearer $env:GITHUB_TOKEN" }
+    $release = Invoke-RestMethod -Uri "https://api.github.com/repos/livekit/livekit/releases/latest" -Headers $lkHeaders
     $asset = $release.assets | Where-Object { $_.name -match '^livekit_.*_windows_amd64\.zip$' } | Select-Object -First 1
     if (-not $asset) {
         throw "livekit windows asset not found in latest release."
