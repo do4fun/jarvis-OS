@@ -285,7 +285,7 @@ def build(
     _google_creds = (_root / settings.google_credentials_path).resolve()
     _gmail_token = (_root / settings.google_gmail_token_path).resolve()
     _calendar_token = (_root / settings.google_token_path).resolve()
-    allowed_roots = [Path(r).expanduser().resolve() for r in settings.file_search_roots]
+    allowed_roots = [Path(r).expanduser().resolve() for r in settings.granted_search_path]
 
     calendar_list_tool = CalendarListTool(
         credentials_path=_google_creds, token_path=_calendar_token

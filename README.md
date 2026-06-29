@@ -230,6 +230,14 @@ Le backend choisi pilote le chat texte et les tâches background (mémoire, cons
 
 **Pipeline vocal LiveKit temps réel :** c'est un process séparé (`jarvis.interfaces.voice.agent`) qui utilise les plugins LLM de LiveKit. Il suit `API_BACKEND` (OpenAI / Anthropic / Mistral). Si le backend n'est pas géré côté LiveKit, il bascule sur Gemini (`GOOGLE_API_KEY` requis). Surcharge possible via `VOICE_LLM_MODEL`.
 
+**Accès fichiers (`GRANTED_SEARCH_PATH`) :** par défaut Jarvis peut lire `~/`. Pour le restreindre à ton projet ou à plusieurs dossiers, ajoute dans `.env` :
+
+```
+GRANTED_SEARCH_PATH=C:\dev\jarvis-OS,C:\Users\moi\Documents
+```
+
+Les chemins sont séparés par des virgules. `ReadFileTool` et `FindFilesTool` refuseront tout accès hors de ces racines.
+
 **Intégrations Google (Gmail / Calendar) :** place ton `credentials.json` issu de Google Cloud Console dans `config/google_credentials.json`, puis démarre Jarvis, il ouvrira le flux d'authentification OAuth et sauvegardera les tokens en local (ils sont gitignorés).
 
 **Reconnaissance faciale (séquence Wake Up) :** pour que le scan biométrique te reconnaisse, place une photo de toi (format JPG, visage bien visible, bonne luminosité) dans :
@@ -260,7 +268,8 @@ uv sync --extra vision
 | `notion` | Rechercher et lire des pages |
 | `weather` | Météo actuelle (Open-Meteo, sans clé API) |
 | `vision` | Capture d'écran + détection d'objets YOLOv8 |
-| `filesystem` | Lire des fichiers, chercher par pattern |
+| `filesystem` | Lire des fichiers, chercher par pattern (répertoires définis par `GRANTED_SEARCH_PATH`) |
+| `launch_app` | Ouvrir des applications Windows locales (configurées dans `config/apps.yaml`) |
 | `cli` | Lancer des commandes shell whitelistées (configurées dans `config/tools.yaml`) |
 | `memory` | Écrire des notes structurées dans le topic store |
 
