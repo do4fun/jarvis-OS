@@ -628,7 +628,11 @@ async def _resolve_sip_caller_context(ctx: object) -> str:
         logger.warning("SessionKeyStore inaccessible pour l'identité SIP (%s)", e)
         existing_session = None
 
-    logger.info("Appel Twilio identifié", numero=phone_number, session_existante=bool(existing_session))
+    logger.info(
+        "Appel Twilio identifié — numero=%s session_existante=%s",
+        phone_number,
+        bool(existing_session),
+    )
 
     if existing_session:
         return (
