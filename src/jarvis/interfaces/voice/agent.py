@@ -36,7 +36,6 @@ from livekit.plugins import deepgram, elevenlabs, silero
 from livekit.plugins import google as lk_google
 from livekit.plugins.google.beta import gemini_tts
 
-
 # Plugins optionnels : LiveKit exige register_plugin() sur le main thread.
 # On force l'import ici (module chargé sur le main thread au démarrage)
 # pour que les imports lazy dans _build_voice_llm/_build_voice_stt

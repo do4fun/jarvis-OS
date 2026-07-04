@@ -55,7 +55,8 @@ async def setup_channels(app: FastAPI, container: Container) -> MessagingGateway
     messaging_enabled = os.getenv("MESSAGING_GATEWAY_ENABLED", "false").lower() == "true"
     twilio_enabled = settings.twilio_enabled
 
-    if is_offline_mode() and (telegram_enabled or discord_enabled or messaging_enabled or twilio_enabled):
+    _any_enabled = telegram_enabled or discord_enabled or messaging_enabled or twilio_enabled
+    if is_offline_mode() and _any_enabled:
         logger.info(
             "Canaux réseau (Telegram/Discord/Twilio) désactivés — mode local actif",
             telegram=telegram_enabled,
@@ -73,7 +74,9 @@ async def setup_channels(app: FastAPI, container: Container) -> MessagingGateway
         if discord_enabled:
             messaging_gw.register(DiscordChannel())
         if twilio_enabled:
-            twilio_channel = TwilioMessagingChannel(session_key_store=messaging_gw.session_key_store)
+            twilio_channel = TwilioMessagingChannel(
+                session_key_store=messaging_gw.session_key_store
+            )
             messaging_gw.register(twilio_channel)
             app.state.twilio_messaging = twilio_channel
             app.include_router(twilio_router)

@@ -510,7 +510,9 @@ class Settings(BaseSettings):
         default=False,
         description="Active le canal Twilio (WhatsApp/Messenger via webhook).",
     )
-    twilio_account_sid: str = Field(default="", description="Account SID Twilio (Console → Account Info).")
+    twilio_account_sid: str = Field(
+        default="", description="Account SID Twilio (Console → Account Info)."
+    )
     twilio_auth_token: SecretStr = Field(default=SecretStr(""), description="Auth Token Twilio.")
     twilio_whatsapp_number: str = Field(
         default="",
@@ -518,7 +520,9 @@ class Settings(BaseSettings):
     )
     twilio_messenger_page_id: str = Field(
         default="",
-        description="ID de la page Facebook connectée dans la console Twilio (messenger:<PAGE_ID>).",
+        description=(
+            "ID de la page Facebook connectée dans la console Twilio (messenger:<PAGE_ID>)."
+        ),
     )
     twilio_whatsapp_template_content_sid: str = Field(
         default="",
@@ -537,7 +541,9 @@ class Settings(BaseSettings):
     )
     twilio_validate_signature: bool = Field(
         default=True,
-        description="Valide X-Twilio-Signature sur les webhooks. Ne JAMAIS désactiver en production.",
+        description=(
+            "Valide X-Twilio-Signature sur les webhooks. Ne JAMAIS désactiver en production."
+        ),
     )
 
     @field_validator("twilio_validate_signature")
@@ -556,7 +562,9 @@ class Settings(BaseSettings):
     )
     max_concurrent_calls: int = Field(
         default=10,
-        description="Sémaphore global sur les appels voix Twilio simultanés (garde-fou coût/charge).",
+        description=(
+            "Sémaphore global sur les appels voix Twilio simultanés (garde-fou coût/charge)."
+        ),
     )
 
 

@@ -81,7 +81,9 @@ class TwilioMessagingChannel(ChannelAdapter):
 
         if is_whatsapp:
             last_inbound = self._store.last_inbound_at(_identity_key(target.user_id))
-            outside_window = last_inbound is None or (datetime.now(UTC) - last_inbound) > _SESSION_WINDOW
+            outside_window = (
+                last_inbound is None or (datetime.now(UTC) - last_inbound) > _SESSION_WINDOW
+            )
             if outside_window:
                 await self._send_template_or_skip(from_addr, target.user_id, reply)
                 return

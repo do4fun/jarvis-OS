@@ -42,6 +42,7 @@ from jarvis.capabilities.tools.capability import ReportMissingCapabilityTool
 from jarvis.capabilities.tools.cli import CLIRunnerTool, ExecuteCLITool
 from jarvis.capabilities.tools.filesystem import FindFilesTool, ReadFileTool
 from jarvis.capabilities.tools.gmail import GmailListTool, send_gmail_draft
+from jarvis.capabilities.tools.launch_app import LaunchAppTool
 from jarvis.capabilities.tools.memory import (
     CrossSessionRecallTool,
     MemoryLoadTopicTool,
@@ -49,6 +50,7 @@ from jarvis.capabilities.tools.memory import (
     MemoryTopicWriteTool,
 )
 from jarvis.capabilities.tools.notion import NotionTasksTool
+from jarvis.capabilities.tools.phone_call import PhoneCallTool
 from jarvis.capabilities.tools.preset import ExecutePresetTool
 from jarvis.capabilities.tools.registry import ToolRegistry
 from jarvis.capabilities.tools.run_tests import RunTestsTool
@@ -57,8 +59,6 @@ from jarvis.capabilities.tools.skills import SkillCreateTool, SkillImproveTool, 
 from jarvis.capabilities.tools.spotify import SpotifyTool
 from jarvis.capabilities.tools.subagent import ScriptRPCTool, SpawnSubagentTool
 from jarvis.capabilities.tools.vision import VisionTool
-from jarvis.capabilities.tools.launch_app import LaunchAppTool
-from jarvis.capabilities.tools.phone_call import PhoneCallTool
 from jarvis.capabilities.tools.weather import WeatherTool
 from jarvis.engine.agent import Agent
 from jarvis.engine.approval_checker import ApprovalChecker

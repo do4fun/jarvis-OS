@@ -137,7 +137,9 @@ class PhoneCallTool(Tool):
                         )
                     )
         except Exception as e:
-            logger.error("Échec de création du participant SIP sortant", numero=numero, error=str(e))
+            logger.error(
+                "Échec de création du participant SIP sortant", numero=numero, error=str(e)
+            )
             return ToolResult(content=f"Échec de l'appel vers {numero} : {e}", is_error=True)
 
         logger.info("Appel sortant initié", numero=numero, room=room_name)

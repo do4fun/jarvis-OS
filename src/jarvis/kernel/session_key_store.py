@@ -53,7 +53,9 @@ class SessionKeyStore:
         ).fetchone()
         return row[0] if row else None
 
-    def resolve_or_create(self, identity_key: str, new_session_id_factory: Callable[[], str]) -> str:
+    def resolve_or_create(
+        self, identity_key: str, new_session_id_factory: Callable[[], str]
+    ) -> str:
         existing = self.get(identity_key)
         if existing is not None:
             return existing

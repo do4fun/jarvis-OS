@@ -14,7 +14,6 @@ Couvre :
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
@@ -58,15 +57,24 @@ def test_channel_adapter_est_abstract() -> None:
 
 
 def test_tous_les_stubs_implementent_linterface() -> None:
-    """WhatsApp, Signal, Slack implémentent ChannelAdapter (sans TypeError)."""
+    """Signal, Slack implémentent ChannelAdapter (sans TypeError)."""
     from jarvis.interfaces.channels.signal_bot import SignalChannel
     from jarvis.interfaces.channels.slack_bot import SlackChannel
-    from jarvis.interfaces.channels.whatsapp import WhatsAppChannel
 
-    for cls in (WhatsAppChannel, SignalChannel, SlackChannel):
+    for cls in (SignalChannel, SlackChannel):
         adapter = cls()
         assert isinstance(adapter, ChannelAdapter)
         assert adapter.platform in Platform
+
+
+def test_twilio_messaging_channel_implemente_linterface(tmp_path: Path) -> None:
+    """TwilioMessagingChannel implémente ChannelAdapter et sert whatsapp+messenger."""
+    from jarvis.interfaces.channels.twilio_messaging import TwilioMessagingChannel
+    from jarvis.kernel.session_key_store import SessionKeyStore
+
+    adapter = TwilioMessagingChannel(session_key_store=SessionKeyStore(tmp_path / "sessions.db"))
+    assert isinstance(adapter, ChannelAdapter)
+    assert set(adapter.platforms) == {Platform.WHATSAPP, Platform.MESSENGER}
 
 
 def test_telegram_channel_est_un_channel_adapter() -> None:
@@ -107,7 +115,7 @@ async def test_dispatch_appelle_jarvis_et_envoie_reponse(tmp_path: Path) -> None
     from jarvis.interfaces.channels.gateway import MessagingGateway
 
     jarvis_gw = _make_jarvis_gateway(session_id="sess-1", response="OK !")
-    gw = MessagingGateway(jarvis_gateway=jarvis_gw, session_map_path=tmp_path / "sessions.json")
+    gw = MessagingGateway(jarvis_gateway=jarvis_gw, session_db_path=tmp_path / "sessions.db")
 
     sent: list[tuple[str, MessageTarget]] = []
 
@@ -139,7 +147,7 @@ async def test_dispatch_session_id_passe_au_deuxieme_appel(tmp_path: Path) -> No
     from jarvis.interfaces.channels.gateway import MessagingGateway
 
     jarvis_gw = _make_jarvis_gateway(session_id="sess-xyz")
-    gw = MessagingGateway(jarvis_gateway=jarvis_gw, session_map_path=tmp_path / "sessions.json")
+    gw = MessagingGateway(jarvis_gateway=jarvis_gw, session_db_path=tmp_path / "sessions.db")
 
     class FakeAdapter(ChannelAdapter):
         platform = Platform.TELEGRAM  # type: ignore[assignment]
@@ -184,7 +192,7 @@ async def test_continuite_session_meme_user_cross_plateforme(tmp_path: Path) -> 
         ]
     )
 
-    gw = MessagingGateway(jarvis_gateway=jarvis_gw, session_map_path=tmp_path / "sessions.json")
+    gw = MessagingGateway(jarvis_gateway=jarvis_gw, session_db_path=tmp_path / "sessions.db")
 
     class FakeAdapter(ChannelAdapter):
         def __init__(self, plat: Platform) -> None:
@@ -212,18 +220,18 @@ async def test_continuite_session_meme_user_cross_plateforme(tmp_path: Path) -> 
     await gw.dispatch(tg_msg)
     await gw.dispatch(dc_msg)
 
-    assert gw._session_map["telegram:42"] == "sess-telegram"
-    assert gw._session_map["discord:42"] == "sess-discord"
+    assert gw.session_key_store.get("telegram:42") == "sess-telegram"
+    assert gw.session_key_store.get("discord:42") == "sess-discord"
 
 
 @pytest.mark.asyncio
 async def test_session_map_persistee_sur_disque(tmp_path: Path) -> None:
-    """La session map est sauvegardée en JSON après dispatch."""
+    """La session map est sauvegardée dans le SessionKeyStore SQLite après dispatch."""
     from jarvis.interfaces.channels.gateway import MessagingGateway
 
     jarvis_gw = _make_jarvis_gateway(session_id="persisted-id")
-    path = tmp_path / "map.json"
-    gw = MessagingGateway(jarvis_gateway=jarvis_gw, session_map_path=path)
+    path = tmp_path / "sessions.db"
+    gw = MessagingGateway(jarvis_gateway=jarvis_gw, session_db_path=path)
 
     class FakeAdapter(ChannelAdapter):
         platform = Platform.TELEGRAM  # type: ignore[assignment]
@@ -241,20 +249,20 @@ async def test_session_map_persistee_sur_disque(tmp_path: Path) -> None:
     await gw.dispatch(_make_incoming(user_id="99"))
 
     assert path.exists()
-    data = json.loads(path.read_text(encoding="utf-8"))
-    assert data["telegram:99"] == "persisted-id"
+    assert gw.session_key_store.get("telegram:99") == "persisted-id"
 
 
 @pytest.mark.asyncio
 async def test_session_map_rechargee_depuis_disque(tmp_path: Path) -> None:
-    """Une gateway relancée restaure la session map depuis le fichier JSON."""
+    """Une gateway relancée restaure la session map depuis le SessionKeyStore SQLite."""
     from jarvis.interfaces.channels.gateway import MessagingGateway
+    from jarvis.kernel.session_key_store import SessionKeyStore
 
-    path = tmp_path / "map.json"
-    path.write_text(json.dumps({"telegram:5": "restored-sess"}), encoding="utf-8")
+    path = tmp_path / "sessions.db"
+    SessionKeyStore(path).persist("telegram:5", "restored-sess")
 
     jarvis_gw = _make_jarvis_gateway(session_id="new-sess")
-    gw = MessagingGateway(jarvis_gateway=jarvis_gw, session_map_path=path)
+    gw = MessagingGateway(jarvis_gateway=jarvis_gw, session_db_path=path)
 
     class FakeAdapter(ChannelAdapter):
         platform = Platform.TELEGRAM  # type: ignore[assignment]
