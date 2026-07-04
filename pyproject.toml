@@ -58,6 +58,9 @@ dependencies = [
     "fastembed>=0.4.0",
     # Musique locale Linux : MPRIS via D-Bus (pur Python, sans binaire système)
     "jeepney>=0.8.0",
+    # Twilio (messagerie WhatsApp/Messenger + rate limiting appels sortants SIP)
+    "twilio>=9.3.0",
+    "aiolimiter>=1.1.0",
 ]
 
 [project.optional-dependencies]

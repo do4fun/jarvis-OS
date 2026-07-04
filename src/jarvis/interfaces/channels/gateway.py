@@ -5,21 +5,22 @@
 """Gateway de messagerie unifié Jarvis.
 
 MessagingGateway orchestre N ChannelAdapters, assure la continuité de session
-cross-plateforme en persistant un mapping (platform:user_id → session_id) sur
-disque, et route chaque message entrant vers le core.Gateway Jarvis.
+cross-plateforme en persistant un mapping (platform:user_id → session_id) dans
+un SessionKeyStore SQLite, et route chaque message entrant vers le core.Gateway
+Jarvis.
 """
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 from loguru import logger
 
 from jarvis.engine.gateway import Gateway as JarvisGateway
 from jarvis.interfaces.channels.base import ChannelAdapter, IncomingMessage, MessageTarget
+from jarvis.kernel.session_key_store import SessionKeyStore
 
-_SESSION_MAP_FILE = Path("memory/messaging_sessions.json")
+_SESSION_DB_FILE = Path("memory/messaging_sessions.db")
 
 
 class MessagingGateway:
@@ -38,29 +39,34 @@ class MessagingGateway:
     def __init__(
         self,
         jarvis_gateway: JarvisGateway,
-        session_map_path: Path = _SESSION_MAP_FILE,
+        session_db_path: Path = _SESSION_DB_FILE,
+        session_key_store: SessionKeyStore | None = None,
     ) -> None:
         self._jarvis = jarvis_gateway
         self._adapters: dict[str, ChannelAdapter] = {}
-        self._session_map_path = session_map_path
-        self._session_map: dict[str, str] = self._load_session_map()
+        self._store = session_key_store or SessionKeyStore(session_db_path)
 
     # ── Gestion des adaptateurs ───────────────────────────────────────────────
 
     def register(self, adapter: ChannelAdapter) -> None:
-        """Enregistre un adaptateur et lui injecte le callback de dispatch."""
+        """Enregistre un adaptateur et lui injecte le callback de dispatch.
+
+        Un adaptateur peut servir plusieurs plateformes (ex. TwilioMessagingChannel
+        pour whatsapp + messenger) — il est indexé sous chacune via `adapter.platforms`."""
         adapter.set_dispatch(self.dispatch)
-        self._adapters[adapter.platform.value] = adapter
-        logger.info("Canal enregistré", platform=adapter.platform.value)
+        for plat in adapter.platforms:
+            self._adapters[plat.value] = adapter
+        logger.info("Canal enregistré", platforms=[p.value for p in adapter.platforms])
 
     async def start_all(self) -> None:
-        """Démarre tous les adaptateurs enregistrés."""
-        for adapter in self._adapters.values():
+        """Démarre tous les adaptateurs enregistrés (dédupliqués — un adaptateur
+        multi-plateforme apparaît sous plusieurs clés de `_adapters`)."""
+        for adapter in {id(a): a for a in self._adapters.values()}.values():
             await adapter.start()
 
     async def stop_all(self) -> None:
-        """Arrête proprement tous les adaptateurs."""
-        for adapter in self._adapters.values():
+        """Arrête proprement tous les adaptateurs (dédupliqués)."""
+        for adapter in {id(a): a for a in self._adapters.values()}.values():
             await adapter.stop()
 
     # ── Dispatch ─────────────────────────────────────────────────────────────
@@ -71,7 +77,7 @@ class MessagingGateway:
         La session est restaurée depuis le mapping persisté si elle existe,
         ou créée à la volée par le core.Gateway.
         """
-        session_id = self._session_map.get(msg.session_key)
+        session_id = self._store.get(msg.session_key)
 
         logger.debug(
             "Dispatch message",
@@ -87,9 +93,9 @@ class MessagingGateway:
             stream=False,
         )
 
-        # Persiste le session_id (nouveau ou restauré)
-        self._session_map[msg.session_key] = str(session.id)
-        self._save_session_map()
+        # Persiste le session_id (nouveau ou restauré) — SQLite WAL, écriture
+        # concurrente sûre entre canaux (cf. audit §2.2).
+        self._store.persist(msg.session_key, str(session.id))
 
         adapter = self._adapters.get(msg.platform.value)
         if adapter is None:
@@ -103,22 +109,7 @@ class MessagingGateway:
         )
         await adapter.send(str(response), target)
 
-    # ── Persistance session map ───────────────────────────────────────────────
-
-    def _load_session_map(self) -> dict[str, str]:
-        if self._session_map_path.exists():
-            try:
-                return json.loads(self._session_map_path.read_text(encoding="utf-8"))
-            except (json.JSONDecodeError, OSError) as exc:
-                logger.warning("Impossible de charger messaging_sessions.json", error=str(exc))
-        return {}
-
-    def _save_session_map(self) -> None:
-        try:
-            self._session_map_path.parent.mkdir(parents=True, exist_ok=True)
-            self._session_map_path.write_text(
-                json.dumps(self._session_map, indent=2, ensure_ascii=False),
-                encoding="utf-8",
-            )
-        except OSError as exc:
-            logger.warning("Impossible de sauvegarder messaging_sessions.json", error=str(exc))
+    @property
+    def session_key_store(self) -> SessionKeyStore:
+        """Exposé pour que d'autres interfaces (voix Twilio) partagent le même store."""
+        return self._store

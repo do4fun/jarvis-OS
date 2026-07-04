@@ -23,6 +23,7 @@ class Platform(StrEnum):
     TELEGRAM = "telegram"
     DISCORD = "discord"
     WHATSAPP = "whatsapp"
+    MESSENGER = "messenger"
     SIGNAL = "signal"
     SLACK = "slack"
 
@@ -36,11 +37,18 @@ class IncomingMessage:
     text: str
     channel_id: str = ""
     raw: object = field(default=None, hash=False, compare=False)
+    identity_key: str | None = None
 
     @property
     def session_key(self) -> str:
-        """Clé de session unique : 'platform:user_id'."""
-        return f"{self.platform.value}:{self.user_id}"
+        """Clé de session unique.
+
+        Par défaut 'platform:user_id'. Un adaptateur peut fournir `identity_key`
+        pour unifier le contexte à travers plusieurs canaux qui partagent la
+        même identité réelle (ex. numéro E.164 Twilio partagé entre WhatsApp
+        et la voix) — cf. docs/architecture/2026-06-28-twilio-multicanal-v2.md §4.1.
+        """
+        return self.identity_key or f"{self.platform.value}:{self.user_id}"
 
 
 @dataclass(frozen=True)
@@ -68,7 +76,14 @@ class ChannelAdapter(ABC):
     @property
     @abstractmethod
     def platform(self) -> Platform:
-        """Identifiant de la plateforme."""
+        """Identifiant de la plateforme principale (utilisé par défaut par `platforms`)."""
+
+    @property
+    def platforms(self) -> tuple[Platform, ...]:
+        """Plateformes servies par cet adaptateur — un seul adaptateur peut en
+        couvrir plusieurs (ex. TwilioMessagingChannel : whatsapp + messenger).
+        Par défaut, une seule (`platform`) ; à surcharger si besoin."""
+        return (self.platform,)
 
     @abstractmethod
     async def start(self) -> None:

@@ -11,6 +11,7 @@ Test console (sans browser) : uv run python voice_agent.py console
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import sys
@@ -53,7 +54,20 @@ except ImportError:
 from jarvis.bootstrap import build
 from jarvis.capabilities.skills.registry import SkillRegistry
 from jarvis.kernel.paths import PROJECT_ROOT  # noqa: E402
+from jarvis.kernel.session_key_store import SessionKeyStore
 from jarvis.kernel.settings import settings
+
+# Partagé avec MessagingGateway (interfaces/channels/gateway.py) : même fichier,
+# même clé d'identité normalisée "twilio:+E164" — unifie l'identité (pas encore
+# l'historique de conversation complet, cf. docs/architecture/
+# 2026-06-28-twilio-multicanal-v2.md §7 "risques résiduels assumés") entre un
+# appel Twilio et une conversation WhatsApp pour le même numéro.
+_SIP_SESSION_DB = PROJECT_ROOT / "memory" / "messaging_sessions.db"
+# Préfixe de nom de room que la Dispatch Rule LiveKit doit utiliser pour les
+# appels Twilio entrants (provisionné côté console/API LiveKit, hors dépôt) —
+# permet de ne tenter la résolution SIP que pour ces rooms, jamais pour les
+# sessions navigateur classiques.
+_SIP_ROOM_PREFIX = "jarvis-sip-"
 
 load_dotenv(PROJECT_ROOT / ".env")
 
@@ -574,6 +588,59 @@ def _build_voice_llm(env: dict) -> object:
 # ─── Session et pipeline ───────────────────────────────────────────────────────
 
 
+async def _resolve_sip_caller_context(ctx: object) -> str:
+    """Si cette room provient d'un appel Twilio (Dispatch Rule LiveKit SIP —
+    cf. docs/architecture/2026-06-28-twilio-multicanal-v2.md §2.2), résout
+    l'identité normalisée du numéro appelant et renvoie une note de contexte
+    courte à préfixer aux instructions. Retourne "" pour toute session non-SIP
+    (navigateur) — aucun impact sur le chemin existant.
+    """
+    room = getattr(ctx, "room", None)
+    room_name = getattr(room, "name", "") or ""
+    if not room_name.startswith(_SIP_ROOM_PREFIX):
+        return ""
+
+    phone_number: str | None = None
+    # Le participant SIP peut ne pas être encore visible à l'instant où l'agent
+    # démarre — courte attente bornée, uniquement sur ce chemin SIP.
+    for _ in range(10):
+        for participant in getattr(room, "remote_participants", {}).values():
+            attrs = getattr(participant, "attributes", {}) or {}
+            phone_number = attrs.get("sip.phoneNumber")
+            if phone_number:
+                break
+        if phone_number:
+            break
+        await asyncio.sleep(0.2)
+
+    if not phone_number:
+        logger.warning(
+            "Room SIP '%s' sans attribut sip.phoneNumber détecté — identité non résolue.",
+            room_name,
+        )
+        return ""
+
+    identity_key = f"twilio:{phone_number}"
+    try:
+        store = SessionKeyStore(_SIP_SESSION_DB)
+        existing_session = store.get(identity_key)
+        store.close()
+    except Exception as e:
+        logger.warning("SessionKeyStore inaccessible pour l'identité SIP (%s)", e)
+        existing_session = None
+
+    logger.info("Appel Twilio identifié", numero=phone_number, session_existante=bool(existing_session))
+
+    if existing_session:
+        return (
+            f"[Appel téléphonique en cours avec {phone_number} — une conversation "
+            "existante est associée à ce numéro sur un autre canal (WhatsApp). "
+            "Tu n'as pas accès à son historique verbatim ici, mais garde en tête "
+            "qu'il s'agit d'un contact déjà connu.]\n\n"
+        )
+    return f"[Appel téléphonique en cours avec {phone_number} — nouveau contact.]\n\n"
+
+
 async def entrypoint(ctx: object) -> None:
 
     _env = dotenv_values(PROJECT_ROOT / ".env")
@@ -604,7 +671,8 @@ async def entrypoint(ctx: object) -> None:
     # Préfixe le contexte dynamique (date/heure + profil) à CHAQUE session : les
     # instructions de base sont préchauffées une fois, mais la date/heure doit être
     # fraîche et le profil disponible directement (pas via memory_search).
-    instructions = _dynamic_context() + "\n\n" + instructions
+    _sip_context = await _resolve_sip_caller_context(ctx)
+    instructions = _sip_context + _dynamic_context() + "\n\n" + instructions
     tools = userdata.get("tools") or _build_voice_tools()
     vad = userdata.get("vad") or silero.VAD.load(
         min_speech_duration=0.05,

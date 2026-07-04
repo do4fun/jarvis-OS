@@ -25,10 +25,13 @@ from loguru import logger
 
 import jarvis.interfaces.channels.telegram_bot as _tg_module
 from jarvis.interfaces.api.channels import router as channels_router
+from jarvis.interfaces.api.twilio import router as twilio_router
 from jarvis.interfaces.channels.discord_bot import DiscordChannel
 from jarvis.interfaces.channels.gateway import MessagingGateway
 from jarvis.interfaces.channels.telegram_bot import TelegramChannel
+from jarvis.interfaces.channels.twilio_messaging import TwilioMessagingChannel
 from jarvis.kernel.connectivity import is_offline_mode
+from jarvis.kernel.settings import settings
 
 if TYPE_CHECKING:
     from jarvis.bootstrap import Container
@@ -50,16 +53,18 @@ async def setup_channels(app: FastAPI, container: Container) -> MessagingGateway
     telegram_enabled = os.getenv("TELEGRAM_ENABLED", "false").lower() == "true"
     discord_enabled = os.getenv("DISCORD_ENABLED", "false").lower() == "true"
     messaging_enabled = os.getenv("MESSAGING_GATEWAY_ENABLED", "false").lower() == "true"
+    twilio_enabled = settings.twilio_enabled
 
-    if is_offline_mode() and (telegram_enabled or discord_enabled or messaging_enabled):
+    if is_offline_mode() and (telegram_enabled or discord_enabled or messaging_enabled or twilio_enabled):
         logger.info(
-            "Canaux réseau (Telegram/Discord) désactivés — mode local actif",
+            "Canaux réseau (Telegram/Discord/Twilio) désactivés — mode local actif",
             telegram=telegram_enabled,
             discord=discord_enabled,
+            twilio=twilio_enabled,
         )
         return None
 
-    if messaging_enabled:
+    if messaging_enabled or twilio_enabled:
         messaging_gw = MessagingGateway(jarvis_gateway=container.gateway)
         if telegram_enabled:
             telegram = TelegramChannel()
@@ -67,6 +72,11 @@ async def setup_channels(app: FastAPI, container: Container) -> MessagingGateway
             messaging_gw.register(telegram)
         if discord_enabled:
             messaging_gw.register(DiscordChannel())
+        if twilio_enabled:
+            twilio_channel = TwilioMessagingChannel(session_key_store=messaging_gw.session_key_store)
+            messaging_gw.register(twilio_channel)
+            app.state.twilio_messaging = twilio_channel
+            app.include_router(twilio_router)
         app.state.messaging_gateway = messaging_gw
         app.include_router(channels_router)
         await messaging_gw.start_all()

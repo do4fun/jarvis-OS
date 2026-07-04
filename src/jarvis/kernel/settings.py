@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, ValidationInfo, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _VALID_WHISPER = frozenset(
@@ -504,6 +504,60 @@ class Settings(BaseSettings):
     log_dir: str = Field(default="logs", description="Répertoire des fichiers de log (relatif à PROJECT_ROOT ou absolu).")
     orb_listening_form: str = Field(default="pulse", description="Forme visuelle de l'orbe quand l'utilisateur parle (VAD actif). pulse|waves|orbital|morph|spectrum|blob|particles|fibonacci")
     orb_thinking_form: str = Field(default="pulse", description="Forme visuelle de l'orbe quand Jarvis réfléchit (requête en cours). pulse|wave|orbital|particles")
+
+    # ── Twilio — messagerie (WhatsApp/Messenger) ──────────────
+    twilio_enabled: bool = Field(
+        default=False,
+        description="Active le canal Twilio (WhatsApp/Messenger via webhook).",
+    )
+    twilio_account_sid: str = Field(default="", description="Account SID Twilio (Console → Account Info).")
+    twilio_auth_token: SecretStr = Field(default=SecretStr(""), description="Auth Token Twilio.")
+    twilio_whatsapp_number: str = Field(
+        default="",
+        description="Sender WhatsApp Twilio, ex whatsapp:+14155238886 (sandbox ou prod).",
+    )
+    twilio_messenger_page_id: str = Field(
+        default="",
+        description="ID de la page Facebook connectée dans la console Twilio (messenger:<PAGE_ID>).",
+    )
+    twilio_whatsapp_template_content_sid: str = Field(
+        default="",
+        description=(
+            "ContentSid d'un template WhatsApp approuvé, utilisé pour tout message envoyé hors "
+            "de la fenêtre de service de 24h (sinon erreur Twilio 63016 — cf. docs/architecture/"
+            "2026-06-28-twilio-multicanal-v2.md §3.4)."
+        ),
+    )
+    public_base_url: str = Field(
+        default="",
+        description=(
+            "URL HTTPS publique du serveur (ngrok/reverse proxy), utilisée pour la reconstruction "
+            "de l'URL signée lors de la validation X-Twilio-Signature."
+        ),
+    )
+    twilio_validate_signature: bool = Field(
+        default=True,
+        description="Valide X-Twilio-Signature sur les webhooks. Ne JAMAIS désactiver en production.",
+    )
+
+    @field_validator("twilio_validate_signature")
+    @classmethod
+    def _forbid_disabled_twilio_signature_in_prod(cls, v: bool, info: ValidationInfo) -> bool:
+        # Cf. audit §3.1 : un webhook non authentifié en prod expose tout le tool_registry
+        # (filesystem, gmail, calendar, launch_app…) à n'importe quel POST forgé.
+        if not v and info.data.get("environment") == "production":
+            raise ValueError("twilio_validate_signature ne peut pas être désactivé en production.")
+        return v
+
+    # ── LiveKit SIP — voix Twilio (appels entrants/sortants) ──
+    livekit_sip_outbound_trunk_id: str = Field(
+        default="",
+        description="ID du trunk SIP sortant LiveKit (provisionné côté console/API LiveKit).",
+    )
+    max_concurrent_calls: int = Field(
+        default=10,
+        description="Sémaphore global sur les appels voix Twilio simultanés (garde-fou coût/charge).",
+    )
 
 
 # Singleton — importé partout via `from config.settings import settings`
