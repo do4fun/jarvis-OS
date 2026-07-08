@@ -5,7 +5,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-env_path = Path('.env')
+env_path = Path(__file__).resolve().parent.parent.parent / ".env"
 values = {}
 if env_path.exists():
     for line in env_path.read_text(encoding='utf-8').splitlines():

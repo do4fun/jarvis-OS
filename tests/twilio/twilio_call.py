@@ -5,7 +5,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-env_path = Path('.env')
+env_path = Path(__file__).resolve().parent.parent.parent / ".env"
 values = {}
 if env_path.exists():
     for line in env_path.read_text(encoding='utf-8').splitlines():
@@ -17,11 +17,18 @@ if env_path.exists():
 
 sid = values.get('TWILIO_ACCOUNT_SID') or os.environ.get('TWILIO_ACCOUNT_SID')
 token = values.get('TWILIO_AUTH_TOKEN') or os.environ.get('TWILIO_AUTH_TOKEN')
-from_number = '+14375252879'
-to_number = '+15146217663'
+from_number = values.get('TWILIO_FROM_NUMBER') or os.environ.get('TWILIO_FROM_NUMBER')
+to_number = values.get('TWILIO_TEST_TO_NUMBER') or os.environ.get('TWILIO_TEST_TO_NUMBER')
 
-if not sid or not token:
-    print(json.dumps({'ok': False, 'error': 'MISSING_CREDENTIALS'}))
+if not sid or not token or not from_number or not to_number:
+    print(json.dumps({
+        'ok': False,
+        'error': 'MISSING_CALL_CONFIG',
+        'required': [
+            'TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN',
+            'TWILIO_FROM_NUMBER', 'TWILIO_TEST_TO_NUMBER',
+        ],
+    }, ensure_ascii=False))
     raise SystemExit(1)
 
 body = urllib.parse.urlencode({

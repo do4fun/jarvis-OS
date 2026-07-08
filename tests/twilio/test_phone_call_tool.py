@@ -67,10 +67,12 @@ def _fake_livekit_api_factory(sip_client: _FakeSipClient) -> object:
 
 @pytest.mark.asyncio
 async def test_numero_invalide_rejete() -> None:
+    """Un numéro sans '+' (non E.164) doit être rejeté — pas _NUMERO, qui est valide."""
     tool = PhoneCallTool()
-    result = await tool.execute(numero="0145551234", intention=_INTENTION)
+    numero_invalide = "0145551234"
+    result = await tool.execute(numero=numero_invalide, intention=_INTENTION)
     assert result.is_error
-    assert "0145551234" in result.content
+    assert numero_invalide in result.content
     assert tool._pending == {}
 
 
@@ -139,8 +141,8 @@ async def test_confirm_cree_le_bon_participant_sip(monkeypatch: pytest.MonkeyPat
     request = sip_client.calls[0]
     assert request.sip_trunk_id == "trunk-abc"
     assert request.sip_call_to == _NUMERO
-    assert request.room_name == "jarvis-call-15145551234"
-    assert request.participant_identity == "sip-15145551234"
+    assert request.room_name == f"jarvis-call-{_NUMERO.lstrip('+')}"
+    assert request.participant_identity == f"sip-{_NUMERO.lstrip('+')}"
     assert request.participant_metadata == _INTENTION
     assert request.wait_until_answered is False
     assert _NUMERO not in tool._pending
