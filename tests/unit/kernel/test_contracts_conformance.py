@@ -104,3 +104,12 @@ def test_conformance_runtime_check() -> None:
     from jarvis.engine.tracking import UsageTracker
 
     assert isinstance(UsageTracker(), contracts.UsageTracker)
+
+
+def test_openclaw_client_conforme_au_protocol() -> None:
+    """Verify OpenClawClient respects the OpenClawClientProtocol contract."""
+    from jarvis.kernel.contracts import OpenClawClientProtocol
+    from jarvis.providers.openclaw.client import OpenClawClient
+
+    client = OpenClawClient(ws_url="ws://x", token="t")
+    assert isinstance(client, OpenClawClientProtocol)
