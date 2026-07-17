@@ -274,6 +274,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             await _task
         except asyncio.CancelledError:
             pass
+    if _openclaw_client is not None:
+        await _openclaw_client.close()
     if _messaging_gw is not None:
         await _messaging_gw.stop_all()
     else:
