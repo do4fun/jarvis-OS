@@ -56,6 +56,7 @@ from jarvis.interfaces.api.websocket import router as ws_router
 from jarvis.interfaces.api.widgets import router as widgets_router
 from jarvis.interfaces.channels.setup import setup_channels
 from jarvis.interfaces.channels.telegram_bot import get_telegram_channel
+from jarvis.interfaces.openclaw.setup import setup_openclaw
 from jarvis.kernel.paths import UI_STATIC_DIR
 from jarvis.kernel.paths import PROJECT_ROOT
 from jarvis.kernel.settings import reload_settings, settings
@@ -253,6 +254,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # ── Channels (Telegram/Discord) — hors-Container par design (interfaces L3) ─
 
     _messaging_gw = await setup_channels(app, container)
+    _openclaw_client = await setup_openclaw(app, container)
 
     logger.info(
         "Jarvis démarré",
