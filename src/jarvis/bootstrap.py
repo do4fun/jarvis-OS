@@ -364,6 +364,21 @@ def build(
     )
     tool_registry.register(ReportMissingCapabilityTool(engine=capability_engine))
 
+    # ── 9bis. VoiceCallTool — appel sortant via Gateway OpenClaw (opt-in) ───
+    import os as _os
+
+    if (
+        _os.getenv("OPENCLAW_ENABLED", "false").lower() == "true"
+        and _os.getenv("OPENCLAW_VOICE_ENABLED", "false").lower() == "true"
+    ):
+        from jarvis.capabilities.tools.openclaw_voice import VoiceCallTool
+        from jarvis.providers.openclaw.client import OpenClawClient
+
+        openclaw_client = OpenClawClient(
+            ws_url=_os.environ["OPENCLAW_WS_URL"], token=_os.environ["OPENCLAW_GATEWAY_TOKEN"]
+        )
+        tool_registry.register(VoiceCallTool(client=openclaw_client))
+
     # ── 10. Engine L2 — Agents ─────────────────────────────────────────────
 
     agent = Agent(
