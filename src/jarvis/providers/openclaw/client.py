@@ -11,7 +11,10 @@ from websockets.asyncio.client import ClientConnection
 
 
 class OpenClawClient:
-    """Client WS du Gateway OpenClaw — corrélation req/res, events, reconnexion.
+    """Client WS du Gateway OpenClaw — corrélation req/res, events.
+
+    Se connecte paresseusement au premier `request()` si `connect()` n'a pas
+    déjà été appelé explicitement (cf. `request()`).
 
     Nommage volontairement distinct de `engine.gateway.Gateway` (cf. convention
     anti-collision du chantier OpenClaw).
@@ -59,7 +62,7 @@ class OpenClawClient:
         timeout: float = 10.0,
     ) -> dict:
         if self._conn is None:
-            raise RuntimeError("OpenClawClient.connect() n'a pas été appelé")
+            await self.connect()
         req_id = str(uuid.uuid4())
         payload = dict(params or {})
         if side_effect:

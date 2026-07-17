@@ -90,6 +90,24 @@ async def test_rpc_error_propagates_exception() -> None:
 
 
 @pytest.mark.asyncio
+async def test_request_sans_connect_prealable_se_connecte_paresseusement() -> None:
+    """Un client jamais `connect()`é explicitement doit pouvoir compléter un
+    `request()` — il se connecte à la demande (cf. bug VoiceCallTool jamais
+    connecté dans bootstrap.py, review finale branche)."""
+
+    async with websockets.serve(_fake_gateway, "127.0.0.1", 0) as server:
+        port = server.sockets[0].getsockname()[1]
+        client = OpenClawClient(ws_url=f"ws://127.0.0.1:{port}", token="secret-token")
+        assert client._conn is None
+        try:
+            result = await client.request("health")
+            assert result == {"status": "ok"}
+            assert client._conn is not None
+        finally:
+            await client.close()
+
+
+@pytest.mark.asyncio
 async def test_timeout_cleans_up_pending_entry() -> None:
     async def _slow_gateway(websocket) -> None:
         await websocket.recv()  # connect
