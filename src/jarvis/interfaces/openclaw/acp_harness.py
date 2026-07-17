@@ -96,7 +96,13 @@ def main() -> None:
         frame = json.loads(line)
         handler = _HANDLERS.get(frame["method"])
         if handler is None:
-            _error(frame["id"], f"Méthode inconnue : {frame['method']}")
+            req_id = frame.get("id")
+            if req_id is None:
+                # Notification sans id : aucune réponse possible, on ignore.
+                sys.stderr.write(f"Méthode inconnue (notification) : {frame.get('method')}\n")
+                sys.stderr.flush()
+                continue
+            _error(req_id, f"Méthode inconnue : {frame['method']}")
             continue
         handler(frame["id"], frame.get("params", {}))
 

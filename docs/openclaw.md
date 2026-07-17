@@ -47,6 +47,13 @@ utilisé par `bin/jarvis-acp-launch.sh`).
 1. Générer/obtenir le token via l'outil CLI du Gateway.
 2. Le stocker dans `.env` (non versionné) sous la clé `OPENCLAW_GATEWAY_TOKEN`.
 
+Pour que le POST du harnais vers `/api/openclaw/message` s'authentifie une
+fois `API_AUTH_ENABLED=true` côté Jarvis, la valeur de `JARVIS_API_TOKEN`
+(environnement du harnais, `bin/jarvis-acp-launch.sh`) doit être identique au
+token configuré côté Jarvis (`API_TOKEN` dans `.env`, exposé comme
+`settings.api_token` — voir `src/jarvis/kernel/settings.py` et la vérification
+dans `src/jarvis/engine/auth.py::verify_api_token`).
+
 ⚠️ **À VÉRIFIER À L'EXÉCUTION** : la commande exacte de génération du token
 n'est pas encore relevée. Se référer à `openclaw --help` (sous-commande
 probable du type `openclaw token create` ou `openclaw auth token`) ou à
