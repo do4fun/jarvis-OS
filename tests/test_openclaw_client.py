@@ -60,3 +60,50 @@ async def test_side_effect_ajoute_idempotency_key() -> None:
             await client.close()
 
     assert "idempotencyKey" in received["params"]
+
+
+@pytest.mark.asyncio
+async def test_rpc_error_propagates_exception() -> None:
+    async def _error_gateway(websocket) -> None:
+        await websocket.recv()  # connect
+        await websocket.send(json.dumps({"type": "connect-ok"}))
+        raw = await websocket.recv()
+        frame = json.loads(raw)
+        await websocket.send(
+            json.dumps({
+                "type": "res",
+                "id": frame["id"],
+                "ok": False,
+                "error": {"message": "boom"}
+            })
+        )
+
+    async with websockets.serve(_error_gateway, "127.0.0.1", 0) as server:
+        port = server.sockets[0].getsockname()[1]
+        client = OpenClawClient(ws_url=f"ws://127.0.0.1:{port}", token="t")
+        await client.connect()
+        try:
+            with pytest.raises(RuntimeError, match="boom"):
+                await client.request("test.method")
+        finally:
+            await client.close()
+
+
+@pytest.mark.asyncio
+async def test_timeout_cleans_up_pending_entry() -> None:
+    async def _slow_gateway(websocket) -> None:
+        await websocket.recv()  # connect
+        await websocket.send(json.dumps({"type": "connect-ok"}))
+        await websocket.recv()  # receive request but never respond
+
+    async with websockets.serve(_slow_gateway, "127.0.0.1", 0) as server:
+        port = server.sockets[0].getsockname()[1]
+        client = OpenClawClient(ws_url=f"ws://127.0.0.1:{port}", token="t")
+        await client.connect()
+        try:
+            with pytest.raises(asyncio.TimeoutError):
+                await client.request("test.method", timeout=0.1)
+            # Verify the pending entry was cleaned up
+            assert len(client._pending) == 0
+        finally:
+            await client.close()

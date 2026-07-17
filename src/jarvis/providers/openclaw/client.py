@@ -39,7 +39,11 @@ class OpenClawClient:
                 if frame["type"] == "res":
                     future = self._pending.pop(frame["id"], None)
                     if future is not None and not future.done():
-                        future.set_result(frame.get("payload", {}))
+                        if frame.get("ok") is False:
+                            error_msg = frame.get("error", {}).get("message", "OpenClaw RPC error")
+                            future.set_exception(RuntimeError(error_msg))
+                        else:
+                            future.set_result(frame.get("payload", {}))
                 elif frame["type"] == "event":
                     for cb in self._event_handlers.get(frame["event"], []):
                         cb(frame.get("payload", {}))
@@ -63,7 +67,10 @@ class OpenClawClient:
         future: asyncio.Future[dict] = asyncio.get_event_loop().create_future()
         self._pending[req_id] = future
         await self._conn.send(json.dumps({"type": "req", "id": req_id, "method": method, "params": payload}))
-        return await asyncio.wait_for(future, timeout=timeout)
+        try:
+            return await asyncio.wait_for(future, timeout=timeout)
+        finally:
+            self._pending.pop(req_id, None)
 
     def on_event(self, event: str, callback: Callable[[dict], None]) -> None:
         self._event_handlers.setdefault(event, []).append(callback)
