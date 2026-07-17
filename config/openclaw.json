@@ -1,0 +1,63 @@
+{
+  gateway: { bind: "127.0.0.1", port: 18789 },
+  agents: {
+    list: [
+      {
+        id: "jarvis",
+        workspace: "./workspace-jarvis",
+        runtime: { type: "acp", acp: { agent: "jarvis-acp", backend: "acpx", mode: "persistent" } },
+      },
+    ],
+  },
+  plugins: {
+    entries: {
+      acpx: {
+        enabled: true,
+        config: {
+          agents: {
+            "jarvis-acp": {
+              command: "bin/jarvis-acp-launch.sh",
+            },
+          },
+        },
+      },
+      "voice-call": {
+        enabled: true,
+        config: {
+          twilio: {
+            accountSid: "${TWILIO_ACCOUNT_SID}",
+            authToken: { secretRef: "twilio-auth-token" },
+            fromNumber: "${OPENCLAW_VOICE_NUMBER}",
+          },
+          publicUrl: "${PUBLIC_BASE_URL}",
+          realtime: {
+            enabled: true,
+            provider: "google",
+            providers: {
+              google: {
+                apiKey: { secretRef: "gemini-api-key" },
+                model: "gemini-3.1-flash-live-preview",
+                speakerVoice: "Kore",
+                silenceDurationMs: 500,
+                startSensitivity: "high",
+              },
+            },
+            agentContext: {
+              enabled: true,
+              maxChars: 6000,
+              includeIdentity: true,
+              files: ["SOUL.md", "IDENTITY.md", "USER.md"],
+            },
+            // "provider-direct" (défaut) : le modèle realtime répond seul aux tours
+            // triviaux et n'appelle openclaw_agent_consult (→ Jarvis) que pour les
+            // décisions/outils/mémoire — c'est la Stratégie A. Ne PAS mettre
+            // "force-agent-consult" ici : ça routerait chaque tour vers Jarvis et
+            // annulerait le gain de latence recherché.
+            consultRouting: "provider-direct",
+          },
+        },
+      },
+    },
+  },
+  bindings: [{ type: "acp", agentId: "jarvis", match: { channel: "voice-call" } }],
+}
