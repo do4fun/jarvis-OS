@@ -36,6 +36,19 @@ def test_health(monkeypatch) -> None:
     assert resp.json()["connected"] is True
 
 
+def test_health_gateway_injoignable_retourne_200_deconnecte(monkeypatch) -> None:
+    monkeypatch.setattr("jarvis.interfaces.api.openclaw.verify_api_token", AsyncMock(return_value=None))
+    from jarvis.interfaces.openclaw.session_map import OpenClawSessionMap
+
+    client = _make_app(_gw(), _gw(), OpenClawSessionMap.__new__(OpenClawSessionMap))
+    client.app.state.openclaw_client = MagicMock(
+        health=AsyncMock(side_effect=RuntimeError("OpenClawClient.connect() n'a pas été appelé"))
+    )
+    resp = client.get("/api/openclaw/health")
+    assert resp.status_code == 200
+    assert resp.json() == {"status": "unreachable", "connected": False}
+
+
 def test_message_route_texte_par_defaut(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr("jarvis.interfaces.api.openclaw.verify_api_token", AsyncMock(return_value=None))
     from jarvis.interfaces.openclaw.session_map import OpenClawSessionMap

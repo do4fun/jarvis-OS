@@ -26,7 +26,10 @@ class OpenClawMessageOut(BaseModel):
 @router.get("/health", dependencies=[Depends(verify_api_token)])
 async def openclaw_health(request: Request) -> dict:
     client = request.app.state.openclaw_client
-    status = await client.health()
+    try:
+        status = await client.health()
+    except Exception:  # noqa: BLE001 — Gateway injoignable, on reporte un statut dégradé
+        return {"status": "unreachable", "connected": False}
     return {"status": status.get("status", "unknown"), "connected": True}
 
 
