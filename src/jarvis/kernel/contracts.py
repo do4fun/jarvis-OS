@@ -229,6 +229,28 @@ class TTSEngine(Protocol):
 
 
 @runtime_checkable
+class OpenClawClientProtocol(Protocol):
+    """Client du Gateway OpenClaw (cf. providers/openclaw/client.py).
+
+    Permet aux tools (`capabilities/tools/openclaw_voice.py`) de dépendre
+    du contrat kernel plutôt que d'importer `providers.openclaw` (RÈGLE 2).
+    """
+
+    async def request(
+        self,
+        method: str,
+        params: dict | None = None,
+        *,
+        side_effect: bool = False,
+        timeout: float = 10.0,
+    ) -> dict: ...
+
+    async def health(self) -> dict: ...
+
+    def on_event(self, event: str, callback: Callable[[dict], None]) -> None: ...
+
+
+@runtime_checkable
 class ApprovalChecker(Protocol):
     """Garde-fou approval gating (cf. engine/approval_checker.py).
 

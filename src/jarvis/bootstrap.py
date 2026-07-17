@@ -285,7 +285,7 @@ def build(
     _google_creds = (_root / settings.google_credentials_path).resolve()
     _gmail_token = (_root / settings.google_gmail_token_path).resolve()
     _calendar_token = (_root / settings.google_token_path).resolve()
-    allowed_roots = [Path(r).expanduser().resolve() for r in settings.file_search_roots]
+    allowed_roots = [Path(r).expanduser().resolve() for r in settings.granted_search_path]
 
     calendar_list_tool = CalendarListTool(
         credentials_path=_google_creds, token_path=_calendar_token
@@ -363,6 +363,21 @@ def build(
         auto_install_enabled=settings.auto_install_whitelisted_enabled,
     )
     tool_registry.register(ReportMissingCapabilityTool(engine=capability_engine))
+
+    # ── 9bis. VoiceCallTool — appel sortant via Gateway OpenClaw (opt-in) ───
+    import os as _os
+
+    if (
+        _os.getenv("OPENCLAW_ENABLED", "false").lower() == "true"
+        and _os.getenv("OPENCLAW_VOICE_ENABLED", "false").lower() == "true"
+    ):
+        from jarvis.capabilities.tools.openclaw_voice import VoiceCallTool
+        from jarvis.providers.openclaw.client import OpenClawClient
+
+        openclaw_client = OpenClawClient(
+            ws_url=_os.environ["OPENCLAW_WS_URL"], token=_os.environ["OPENCLAW_GATEWAY_TOKEN"]
+        )
+        tool_registry.register(VoiceCallTool(client=openclaw_client))
 
     # ── 10. Engine L2 — Agents ─────────────────────────────────────────────
 

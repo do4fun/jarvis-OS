@@ -1383,6 +1383,7 @@ dependencies = [
     { name = "sounddevice" },
     { name = "ultralytics" },
     { name = "uvicorn", extra = ["standard"] },
+    { name = "websockets" },
     { name = "yt-dlp" },
 ]
 
@@ -1450,6 +1451,7 @@ requires-dist = [
     { name = "sounddevice", specifier = ">=0.5.5" },
     { name = "ultralytics", specifier = ">=8.0.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32.0" },
+    { name = "websockets", specifier = ">=13.0" },
     { name = "yt-dlp", specifier = ">=2026.3.17" },
 ]
 provides-extras = ["vision", "dev"]

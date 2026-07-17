@@ -182,10 +182,16 @@ class Settings(BaseSettings):
         default="skills",
         description="Répertoire racine des skills OpenClaw/ClawHub.",
     )
-    file_search_roots: list[str] = Field(
-        default=["~/"],
-        description="Répertoires racines autorisés pour la lecture/recherche de fichiers.",
+    granted_search_path_raw: str = Field(
+        default="~/",
+        validation_alias="granted_search_path",
+        description="Répertoires autorisés pour ReadFileTool/FindFilesTool (GRANTED_SEARCH_PATH=chemin1,chemin2).",
     )
+
+    @property
+    def granted_search_path(self) -> list[str]:
+        return [p.strip() for p in self.granted_search_path_raw.split(",") if p.strip()]
+
     google_credentials_path: str = Field(
         default="config/google_credentials.json",
         description="Chemin vers le fichier credentials OAuth2 Google.",

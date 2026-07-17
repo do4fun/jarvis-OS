@@ -1,0 +1,142 @@
+name: Build Windows offline bundle
+
+# Sur push d'un tag vX.Y.Z : build le bundle offline Windows (snapshot figé du
+# code au tag), zippe le PROJET + bundle/ dans un dossier-chapeau jarvis-OS/,
+# crée la release et y attache jarvis-offline-windows-<tag>.zip.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write # créer la release + uploader l'asset
+
+jobs:
+  build:
+    # IMPÉRATIF : bundle Windows (Python portable Windows + binaires natifs +
+    # livekit-server.exe). Ne se build PAS sur Ubuntu.
+    runs-on: windows-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout (au tag)
+        uses: actions/checkout@v4
+
+      # uv géré comme dans ci.yml (cache intégré). Le script sait aussi
+      # auto-installer uv, mais on le fige ici pour la fiabilité CI.
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.11"
+
+      # Script de build EXISTANT, inchangé sauf l'appel API livekit authentifié.
+      # GITHUB_TOKEN : évite le rate-limit anonyme (60/h) sur les IP partagées des
+      # runners, au moment précis (release) où on ne veut pas découvrir un échec.
+      - name: Build offline bundle
+        shell: pwsh
+        run: .\scripts\release\build_bundle.ps1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Vérif PAR CHEMIN de chaque brique critique dans bundle/ AVANT de zipper.
+      # Attrape la perte partielle (ex. livekit-server.exe manquant) que le seul
+      # contrôle de taille raterait (bundle encore ~650 MB sans lui).
+      - name: Vérifier que le bundle est complet
+        shell: pwsh
+        run: |
+          $required = @(
+            "bundle\manifest.json",
+            "bundle\python\python.exe",
+            "bundle\.venv\Scripts\python.exe",
+            "bundle\bin\uv.exe",
+            "bundle\bin\livekit-server.exe",
+            "bundle\models\yolov8n.pt",
+            "bundle\models\piper\fr_FR-upmc-medium.onnx",
+            "bundle\models\piper\fr_FR-upmc-medium.onnx.json"
+          )
+          $missing = $required | Where-Object { -not (Test-Path $_) }
+          if ($missing) {
+            Write-Host "::error::Bundle incomplet — manquants : $($missing -join ', ')"
+            exit 1
+          }
+          Write-Host "Bundle complet (toutes les briques présentes)."
+
+      # Packaging déterministe :
+      #  - allowlist = fichiers SUIVIS par git (source propre) via `git archive` :
+      #    exclut automatiquement .venv racine, __pycache__, *.egg-info, .pytest_cache
+      #    (tous gitignorés) → zip reproductible, zéro bruit de build.
+      #  - + bundle/ (gitignoré, buildé à l'étape précédente).
+      #  - dossier-chapeau jarvis-OS/ (cohérent avec README : `cd jarvis-OS`).
+      - name: Packager le zip
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $zip = "jarvis-offline-windows-$tag.zip"
+          $top = "jarvis-OS"
+          if (Test-Path $zip) { Remove-Item $zip -Force }
+          if (Test-Path $top) { Remove-Item $top -Recurse -Force }
+
+          git archive --format=zip -o _src.zip HEAD
+          if ($LASTEXITCODE -ne 0) { Write-Host "::error::git archive a échoué"; exit 1 }
+          Expand-Archive -Path _src.zip -DestinationPath $top -Force
+          Remove-Item _src.zip -Force
+          Move-Item -Path bundle -Destination (Join-Path $top "bundle")
+
+          Compress-Archive -Path $top -DestinationPath $zip -CompressionLevel Optimal
+          $sizeMB = [math]::Round((Get-Item $zip).Length / 1MB)
+          Write-Host "Zip produit : $zip ($sizeMB MB)"
+          # Ceinture-bretelles par-dessus la vérif par chemin : un vrai bundle pèse ~700 MB.
+          if ($sizeMB -lt 300) {
+            Write-Host "::error::Zip trop petit ($sizeMB MB) — build probablement incomplet."
+            exit 1
+          }
+          "ZIP_PATH=$zip" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      # Vérif POST-zip : les briques critiques sont bien DANS l'archive (au bon
+      # chemin chapeau). Attrape un éventuel raté de packaging. Imprime aussi la
+      # structure pour validation.
+      - name: Vérifier le contenu de l'archive
+        shell: pwsh
+        run: |
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $archive = [System.IO.Compression.ZipFile]::OpenRead((Resolve-Path $env:ZIP_PATH))
+          $entries = $archive.Entries | ForEach-Object { $_.FullName -replace '\\','/' }
+          $count = $archive.Entries.Count
+          $archive.Dispose()
+          $critical = @(
+            "jarvis-OS/bundle/manifest.json",
+            "jarvis-OS/bundle/python/python.exe",
+            "jarvis-OS/bundle/.venv/Scripts/python.exe",
+            "jarvis-OS/bundle/bin/uv.exe",
+            "jarvis-OS/bundle/bin/livekit-server.exe",
+            "jarvis-OS/bundle/models/yolov8n.pt",
+            "jarvis-OS/bundle/models/piper/fr_FR-upmc-medium.onnx",
+            "jarvis-OS/bundle/models/piper/fr_FR-upmc-medium.onnx.json",
+            "jarvis-OS/src/jarvis/app.py",
+            "jarvis-OS/jarvis.ps1",
+            "jarvis-OS/setup.bat",
+            "jarvis-OS/pyproject.toml"
+          )
+          $missing = $critical | Where-Object { $entries -notcontains $_ }
+          if ($missing) {
+            Write-Host "::error::Briques critiques absentes de l'archive : $($missing -join ', ')"
+            exit 1
+          }
+          # Garde-fou anti-bruit : aucun .venv racine ne doit avoir fui dans le zip.
+          $leaked = $entries | Where-Object { $_ -like "jarvis-OS/.venv/*" }
+          if ($leaked) {
+            Write-Host "::error::Un .venv racine a fui dans l'archive ($($leaked.Count) entrées)."
+            exit 1
+          }
+          Write-Host "Archive OK — $count entrées, dossier-chapeau jarvis-OS/, briques critiques présentes, pas de .venv racine."
+
+      - name: Créer la release + attacher le zip
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          generate_release_notes: true # CHANGELOG indexé par phase, pas par version
+          files: ${{ env.ZIP_PATH }}
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
